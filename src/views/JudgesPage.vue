@@ -91,8 +91,10 @@ export default {
   setup() {
     const store = useStore();
     const schedule = computed(() => store.state.schedule);
-    const judges = computed(() => store.state.judges);
     const successMessage = ref("");
+
+    // ✅ Берём судей из localStorage или Vuex
+    const judges = ref(JSON.parse(localStorage.getItem("judges")) || store.state.judges);
 
     // ✅ Сохранение результата отдельного матча
     const saveResult = (index, match) => {
@@ -110,47 +112,62 @@ export default {
 
     // ✅ Обновление судьи
     const updateJudge = (index, judge) => {
+      judges.value[index] = { ...judge };
       store.commit("updateJudge", { index, ...judge });
+
+      // ✅ Сохраняем обновлённый список в localStorage
+      localStorage.setItem("judges", JSON.stringify(judges.value));
     };
 
-    // ✅ Удаление судьи
+    // ✅ Удаление судьи из списка
     const removeJudge = (index) => {
       if (confirm("Удалить судью?")) {
-        store.commit("removeJudge", index);
+        judges.value.splice(index, 1); // Удаляем из списка
+        store.commit("removeJudge", index); // Удаляем из Vuex
+
+        // ✅ Обновляем localStorage
+        localStorage.setItem("judges", JSON.stringify(judges.value));
       }
     };
 
-    // ✅ Импорт списка судей
+    // ✅ Импорт списка судей из Excel
     const importJudges = async (event) => {
-      const file = event.target.files[0];
-      if (!file) return alert("Выберите файл");
+  const file = event.target.files[0];
+  if (!file) return alert("Выберите файл");
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: "array" });
-          const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = new Uint8Array(e.target.result);
+      const workbook = XLSX.read(data, { type: "array" });
+      const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
 
-          if (sheet.length === 0) {
-            alert("Ошибка: Пустой файл");
-            return;
-          }
+      if (sheet.length === 0) {
+        alert("Ошибка: Пустой файл");
+        return;
+      }
 
-          const importedJudges = sheet.map(row => ({
-            name: row.ФИО?.trim() || "Без имени",
-            category: row.Квалификация?.trim() || "Региональная",
-            tatami: row.Татами ? Number(row.Татами) : 1
-          }));
+      // ✅ Учитываем правильное название столбца "ФИО судьи"
+      const importedJudges = sheet.map(row => ({
+        name: row["ФИО судьи"]?.trim() || "Не указано", 
+        category: row["Квалификация"]?.trim() || "Региональная",
+        tatami: row["Татами"] ? Number(row["Татами"]) : 1
+      }));
 
-          store.commit("setJudges", importedJudges);
-          alert("✅ Судьи успешно импортированы!");
-        } catch (error) {
-          alert("Ошибка при обработке файла: " + error.message);
-        }
-      };
-      reader.readAsArrayBuffer(file);
-    };
+      // ✅ Обновляем Vuex и localStorage
+      store.commit("setJudges", importedJudges);
+      judges.value = [...importedJudges];
+      localStorage.setItem("judges", JSON.stringify(importedJudges));
+
+      alert("✅ Судьи успешно импортированы!");
+
+    } catch (error) {
+      alert("Ошибка при обработке файла: " + error.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+};
+
 
     // ✅ Скачивание шаблона списка судей
     const downloadJudgesTemplate = () => {
@@ -160,7 +177,17 @@ export default {
       XLSX.writeFile(wb, "Шаблон_судей.xlsx");
     };
 
-    return { schedule, judges, saveResult, saveAllResults, updateJudge, removeJudge, importJudges, downloadJudgesTemplate };
+    return { 
+      schedule, 
+      judges, 
+      saveResult, 
+      saveAllResults, 
+      updateJudge, 
+      removeJudge, 
+      importJudges, 
+      downloadJudgesTemplate 
+    };
   }
 };
+
 </script>

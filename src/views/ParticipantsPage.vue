@@ -2,18 +2,18 @@
   <div class="container mt-3">
     <h3>👥 Участники соревнования</h3>
 
-    <!-- ✅ Фильтр по командам и весу -->
+    <!-- ✅ Фильтр по имени, команде и весу -->
     <div class="row mb-3">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <input v-model="searchQuery" type="text" class="form-control" placeholder="🔍 Поиск по имени">
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <select v-model="selectedTeam" class="form-select">
           <option value="">Все команды</option>
           <option v-for="team in uniqueTeams" :key="team" :value="team">{{ team }}</option>
         </select>
       </div>
-      <div class="col-md-4">
+      <div class="col-md-3">
         <select v-model="selectedWeight" class="form-select">
           <option value="">Все веса</option>
           <option v-for="weight in uniqueWeights" :key="weight" :value="weight">{{ weight }} кг</option>
@@ -24,6 +24,7 @@
     <!-- ✅ Кнопки управления -->
     <button @click="showAddModal = true" class="btn btn-success mb-3">➕ Добавить участника</button>
     <button @click="downloadParticipants" class="btn btn-outline-primary mb-3 ms-2">📥 Скачать список участников</button>
+    <input type="file" @change="importParticipants" accept=".xlsx, .xls" class="form-control form-control-sm mb-3">
 
     <!-- ✅ Таблица участников -->
     <table class="table table-striped">
@@ -31,8 +32,10 @@
         <tr>
           <th>#</th>
           <th>ФИО</th>
-          <th>Вес</th>
           <th>Команда</th>
+          <th>Вес</th>
+          <th>Город</th>
+          <th>Страна</th>
           <th>Действия</th>
         </tr>
       </thead>
@@ -40,12 +43,14 @@
         <tr v-for="(participant, index) in filteredParticipants" :key="index">
           <td>{{ index + 1 }}</td>
           <td><input v-model="participant.name" class="form-control form-control-sm"></td>
-          <td><input v-model.number="participant.weight" class="form-control form-control-sm" type="number"></td>
           <td>
             <select v-model="participant.team" class="form-select form-select-sm">
               <option v-for="team in uniqueTeams" :key="team" :value="team">{{ team }}</option>
             </select>
           </td>
+          <td><input v-model.number="participant.weight" class="form-control form-control-sm" type="number"></td>
+          <td><input v-model="participant.city" class="form-control form-control-sm"></td>
+          <td><input v-model="participant.country" class="form-control form-control-sm"></td>
           <td>
             <button @click="updateParticipant(index, participant)" class="btn btn-primary btn-sm">💾</button>
             <button @click="removeParticipant(index)" class="btn btn-danger btn-sm ms-2">🗑</button>
@@ -64,6 +69,8 @@
           <option value="">Выберите команду</option>
           <option v-for="team in uniqueTeams" :key="team" :value="team">{{ team }}</option>
         </select>
+        <input v-model="newParticipant.city" type="text" class="form-control mb-2" placeholder="Город">
+        <input v-model="newParticipant.country" type="text" class="form-control mb-2" placeholder="Страна">
         <div class="modal-actions">
           <button @click="addParticipant" class="btn btn-success">✅ Добавить</button>
           <button @click="showAddModal = false" class="btn btn-danger">❌ Закрыть</button>
@@ -82,15 +89,14 @@ export default {
   setup() {
     const store = useStore();
     const participants = computed(() => store.state.participants);
-    const teams = computed(() => store.state.teams);
 
     const searchQuery = ref("");
     const selectedTeam = ref("");
     const selectedWeight = ref("");
     const showAddModal = ref(false);
-    const newParticipant = ref({ name: "", weight: "", team: "" });
+    const newParticipant = ref({ name: "", weight: "", team: "", city: "", country: "" });
 
-    // ✅ Фильтрация участников по имени, команде и весу
+    // ✅ Фильтрация участников
     const filteredParticipants = computed(() => {
       return participants.value.filter(p =>
         (searchQuery.value === "" || p.name.toLowerCase().includes(searchQuery.value.toLowerCase())) &&
@@ -99,18 +105,18 @@ export default {
       );
     });
 
-    // ✅ Получение уникальных команд и весов
+    // ✅ Уникальные команды и веса
     const uniqueTeams = computed(() => [...new Set(participants.value.map(p => p.team))]);
     const uniqueWeights = computed(() => [...new Set(participants.value.map(p => p.weight))]);
 
     // ✅ Добавление участника
     const addParticipant = () => {
-      if (!newParticipant.value.name || !newParticipant.value.weight || !newParticipant.value.team) {
-        alert("Заполните все поля!");
+      if (!newParticipant.value.name || !newParticipant.value.weight || !newParticipant.value.team || !newParticipant.value.city || !newParticipant.value.country) {
+        alert("❌ Заполните все поля!");
         return;
       }
       store.commit("addParticipant", { ...newParticipant.value });
-      newParticipant.value = { name: "", weight: "", team: "" };
+      newParticipant.value = { name: "", weight: "", team: "", city: "", country: "" };
       showAddModal.value = false;
     };
 
@@ -126,44 +132,47 @@ export default {
       }
     };
 
-    // ✅ Скачивание списка участников (Excel)
-    const downloadParticipants = () => {
-      const ws = XLSX.utils.json_to_sheet(participants.value);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Участники");
-      XLSX.writeFile(wb, "Список_участников.xlsx");
+    // ✅ Импорт списка участников
+    const importParticipants = async (event) => {
+      const file = event.target.files[0];
+      if (!file) return alert("Выберите файл");
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+          const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+
+          const headers = sheet[0].map(header => header.trim());
+          const dataRows = sheet.slice(1);
+
+          const importedParticipants = dataRows.map(row => {
+            let participant = {};
+            headers.forEach((header, index) => {
+              if (header === "Команда") participant.team = row[index]?.trim() || "";
+              if (header === "Участник") participant.name = row[index]?.trim() || "";
+              if (header === "Вес") participant.weight = row[index] ? Number(row[index]) : null;
+              if (header === "Город") participant.city = row[index]?.trim() || "";
+              if (header === "Страна") participant.country = row[index]?.trim() || "";
+            });
+            return participant;
+          });
+
+          store.commit("setParticipants", importedParticipants);
+          alert("✅ Участники успешно импортированы!");
+        } catch (error) {
+          alert("Ошибка при обработке файла: " + error.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
     };
 
     return {
       participants, filteredParticipants, searchQuery, selectedTeam, selectedWeight,
       uniqueTeams, uniqueWeights, showAddModal, newParticipant,
-      addParticipant, updateParticipant, removeParticipant, downloadParticipants
+      addParticipant, updateParticipant, removeParticipant, importParticipants
     };
   }
 };
 </script>
-
-<style scoped>
-/* 🔥 Стилизация модального окна */
-.modal-overlay {
-  position: fixed;
-  top: 0; left: 0;
-  width: 100%; height: 100%;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-.modal-content {
-  background: white;
-  padding: 20px;
-  border-radius: 8px;
-  width: 300px;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
-}
-.modal-actions {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 10px;
-}
-</style>

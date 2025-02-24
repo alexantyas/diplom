@@ -13,9 +13,13 @@
       </select>
     </div>
 
-    <!-- ✅ Кнопки управления расписанием -->
-    <button @click="generateSchedule" class="btn btn-primary mb-3">Автоматически сформировать расписание</button>
-    <button @click="addMatch" class="btn btn-success mb-3">Добавить матч</button>
+    <!-- ✅ Кнопки управления расписанием + сохранение -->
+    <div class="d-flex flex-wrap gap-2 mb-3">
+      <button @click="generateSchedule" class="btn btn-primary">Автоматически сформировать расписание</button>
+      <button @click="addMatch" class="btn btn-success">Добавить матч</button>
+      <button @click="saveSchedule" class="btn btn-info">Сохранить расписание</button>
+      <button @click="saveResults" class="btn btn-warning">Сохранить результаты</button>
+    </div>
 
     <!-- ✅ Таблица расписания -->
     <table class="table table-striped">
@@ -26,13 +30,15 @@
           <th>Спортсмен 1</th>
           <th>Спортсмен 2</th>
           <th>Время</th>
+          <th>Судья</th>
+          <th>Татами</th>
           <th>Результат</th>
           <th>Статус</th>
           <th>Действия</th>
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(match, index) in filteredSchedule" :key="index" 
+        <tr v-for="(match, index) in filteredSchedule" :key="index"
             draggable="true"
             @dragstart="dragStart(index)" 
             @drop="drop(index)" 
@@ -45,6 +51,8 @@
                    :disabled="match.fighter2 === 'Автоматическая победа'">
           </td>
           <td><input v-model="match.time" class="form-control form-control-sm" type="time"></td>
+          <td>{{ match.judge }}</td>
+          <td>{{ match.tatami }}</td>
           <td>
             <select v-model="match.result" class="form-select form-select-sm">
               <option value="">Выберите победителя</option>
@@ -63,10 +71,6 @@
       </tbody>
     </table>
 
-    <!-- ✅ Кнопка сохранения расписания -->
-    <button @click="saveSchedule" class="btn btn-success">Сохранить расписание</button>
-    <button @click="saveResults" class="btn btn-info ms-2">Сохранить результаты</button>
-
     <!-- ✅ Уведомление об успешном сохранении -->
     <div v-if="successMessage" class="alert alert-success mt-3">
       {{ successMessage }}
@@ -81,125 +85,135 @@ import { useStore } from "vuex";
 export default {
   setup() {
     const store = useStore();
-    const schedule = computed(() => store.state.schedule);  // ✅ Берём расписание из Vuex
+    const schedule = computed(() => store.state.schedule);
     const participants = computed(() => store.state.participants);
+    const judges = computed(() => store.state.judges);
     const selectedCategory = ref("");
     const successMessage = ref("");
-    const dragIndex = ref(null);
 
-    // ✅ Уникальные категории (для фильтра)
+    // ✅ Фильтрация по категориям
     const uniqueCategories = computed(() => {
-      const categories = new Set(schedule.value.map(m => m.category));
-      return Array.from(categories);
+      return [...new Set(schedule.value.map(m => m.category))];
     });
 
-    // ✅ Фильтрация матчей по категории
     const filteredSchedule = computed(() => {
       if (!selectedCategory.value) return schedule.value;
       return schedule.value.filter(m => m.category === selectedCategory.value);
     });
 
-    // ✅ Определение статуса матча
+    // ✅ Определение статуса
     const getMatchStatus = (match) => {
       if (!match.result) return "Не начат";
       if (match.result === "draw") return "Ничья";
       return `Победитель: ${match.result}`;
     };
 
-    // ✅ Установка класса для статуса
+    // ✅ Определение CSS-класса статуса
     const getStatusClass = (match) => {
       if (!match.result) return "text-muted";
       if (match.result === "draw") return "text-warning";
       return "text-success fw-bold";
     };
 
-    // ✅ Перетаскивание (Drag & Drop)
-    const dragStart = (index) => {
-      dragIndex.value = index;
+    // ✅ Удаление схватки
+    const removeMatch = (index) => {
+      if (confirm("Удалить этот матч?")) {
+        const updatedSchedule = [...schedule.value];
+        updatedSchedule.splice(index, 1);
+        store.commit("setSchedule", updatedSchedule);
+      }
     };
 
-    const drop = (index) => {
-      if (dragIndex.value === null) return;
-
-      const movedMatch = schedule.value.splice(dragIndex.value, 1)[0]; // Убираем матч с прежнего места
-      schedule.value.splice(index, 0, movedMatch); // Вставляем на новое место
-      store.commit("setSchedule", schedule.value); // Сохраняем изменения в Vuex
-
-      dragIndex.value = null;
-    };
-
-    // ✅ Автоматическая генерация расписания (исправлено!)
+    // ✅ Автоматическое формирование расписания с назначением судей
     const generateSchedule = () => {
-      const groupedByWeight = {};
+      if (!participants.value.length) {
+        alert("❌ Нет участников!");
+        return;
+      }
+      if (!judges.value.length) {
+        alert("❌ Нет судей!");
+        return;
+      }
 
-      // Группируем участников по весу
-      participants.value.forEach(participant => {
-        if (!groupedByWeight[participant.weight]) {
-          groupedByWeight[participant.weight] = [];
-        }
-        groupedByWeight[participant.weight].push(participant);
+      const groupedByWeight = {};
+      participants.value.forEach((p) => {
+        if (!groupedByWeight[p.weight]) groupedByWeight[p.weight] = [];
+        groupedByWeight[p.weight].push(p);
       });
 
       const matches = [];
-      Object.keys(groupedByWeight).forEach(weight => {
+      Object.keys(groupedByWeight).forEach((weight) => {
         let fighters = groupedByWeight[weight];
-
-        // Группируем бойцов по командам
-        let teamGroups = {};
-        fighters.forEach(fighter => {
-          if (!teamGroups[fighter.team]) {
-            teamGroups[fighter.team] = [];
-          }
-          teamGroups[fighter.team].push(fighter);
-        });
-
-        // Если бойцы только из одной команды - бой не создаётся
-        if (Object.keys(teamGroups).length < 2) {
-          console.log(`Недостаточно команд в категории ${weight} кг. Расписание не создано.`);
-          return;
-        }
-
-        // Составляем пары бойцов из разных команд
         let availableFighters = [...fighters];
+
         while (availableFighters.length > 1) {
           let fighter1 = availableFighters.shift();
-          let fighter2Index = availableFighters.findIndex(f => f.team !== fighter1.team);
-
-          if (fighter2Index !== -1) {
-            let fighter2 = availableFighters.splice(fighter2Index, 1)[0];
-            matches.push({
-              category: `${weight} кг`,
-              fighter1: fighter1.name,
-              fighter2: fighter2.name,
-              time: "00:00",
-              result: ""
-            });
-          }
+          let fighter2 = availableFighters.shift();
+          let randomJudge = judges.value[Math.floor(Math.random() * judges.value.length)];
+          matches.push({
+            category: `${weight} кг`,
+            fighter1: fighter1.name,
+            fighter2: fighter2.name,
+            time: "00:00",
+            result: "",
+            judge: randomJudge.name,
+            tatami: randomJudge.tatami
+          });
         }
 
-        // Если остался один без соперника – даём "Автоматическую победу"
         if (availableFighters.length === 1) {
+          let randomJudge = judges.value[Math.floor(Math.random() * judges.value.length)];
           matches.push({
             category: `${weight} кг`,
             fighter1: availableFighters[0].name,
             fighter2: "Автоматическая победа",
             time: "00:00",
-            result: availableFighters[0].name
+            result: availableFighters[0].name,
+            judge: randomJudge.name,
+            tatami: randomJudge.tatami
           });
         }
       });
 
+      if (matches.length === 0) {
+        alert("⚠️ Расписание не было составлено. Проверьте участников!");
+        return;
+      }
+
       store.commit("setSchedule", matches);
+      alert("✅ Расписание успешно сгенерировано!");
     };
 
-    return { 
-      schedule, generateSchedule, saveSchedule: () => store.commit("setSchedule", schedule.value),
-      saveResults: () => store.commit("saveResults", schedule.value),
-      addMatch: () => store.commit("addMatch", { category: "Без категории", fighter1: "", fighter2: "", time: "00:00", result: "" }),
-      removeMatch: (index) => store.commit("removeMatch", index),
-      selectedCategory, uniqueCategories, filteredSchedule, getMatchStatus, getStatusClass, successMessage,
-      dragStart, drop
+    // ✅ Сохранение результатов
+    const saveResults = () => {
+      if (!schedule.value.length) {
+        alert("❌ Нет данных для сохранения!");
+        return;
+      }
+
+      store.commit("saveResults", schedule.value);
+      successMessage.value = "✅ Результаты успешно сохранены!";
+      setTimeout(() => {
+        successMessage.value = "";
+      }, 3000);
     };
-  }
+
+    return {
+      schedule,
+      generateSchedule,
+      selectedCategory,
+      uniqueCategories,
+      filteredSchedule,
+      getMatchStatus,
+      getStatusClass,
+      removeMatch,
+      saveResults, // ✅ Добавил сохранение результатов
+      successMessage,
+    };
+  },
 };
 </script>
+
+
+
+

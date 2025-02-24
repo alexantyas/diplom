@@ -9,6 +9,27 @@ export default createStore({
     schedule: JSON.parse(localStorage.getItem('schedule')) || [] // ✅ Добавлено хранение расписания
   },
   mutations: {
+    setJudges(state, judges) { // ✅ Добавили судей
+      state.judges = judges;
+      localStorage.setItem('judges', JSON.stringify(judges));
+    },
+    addJudge(state, judge) { // ✅ Добавить судью
+      state.judges.push(judge);
+      localStorage.setItem('judges', JSON.stringify(state.judges));
+    },
+    updateJudge(state, { index, name, category, tatami }) { // ✅ Обновить судью
+      if (state.judges[index]) {
+        state.judges[index].name = name;
+        state.judges[index].category = category;
+        state.judges[index].tatami = tatami;
+        localStorage.setItem('judges', JSON.stringify(state.judges));
+      }
+    },
+    removeJudge(state, index) { // ✅ Удаление судьи
+      state.judges.splice(index, 1);
+      localStorage.setItem('judges', JSON.stringify(state.judges));
+    
+    },
     setUser(state, user) {
       state.user = user;
       localStorage.setItem('user', JSON.stringify(user));
@@ -72,9 +93,9 @@ export default createStore({
       state.schedule.splice(index, 1);
       localStorage.setItem('schedule', JSON.stringify(state.schedule));
     },
-    saveResults(state, schedule) {  
-      state.schedule = schedule;
-      localStorage.setItem('schedule', JSON.stringify(schedule));
+    saveResults(state, results) {
+      state.schedule = results;
+      localStorage.setItem("schedule", JSON.stringify(results));
     }
   },
   getters: {
@@ -83,6 +104,7 @@ export default createStore({
     competition: state => state.competition,
     teams: state => state.teams,
     participants: state => state.participants,
-    schedule: state => state.schedule // ✅ Добавлен геттер для расписания
+    schedule: state => state.schedule,
+    judges: state => state.judges // ✅ Получение судей из хранилища
   }
 });

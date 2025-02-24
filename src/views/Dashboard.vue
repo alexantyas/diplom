@@ -173,7 +173,21 @@ export default {
       reader.readAsArrayBuffer(file);
     };
 
-    return { userRole, competition, createCompetition, logout, downloadTemplate, importCompetition, importedData };
+    // ✅ Подтверждение импорта
+    const confirmImport = () => {
+      if (importedData.value) {
+        store.commit("setTeams", importedData.value.teams);
+        store.commit("setParticipants", importedData.value.participants);
+        alert("✅ Данные успешно импортированы!");
+        importedData.value = null; // 🔥 Закрываем окно предпросмотра
+      }
+    };
+
+    const cancelImport = () => {
+      importedData.value = null; // 🔥 Закрываем окно предпросмотра
+    };
+
+    return { userRole, competition, createCompetition, logout, downloadTemplate, importCompetition, importedData, confirmImport, cancelImport };
   }
 };
 </script>
