@@ -32,7 +32,11 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(match, index) in filteredSchedule" :key="index">
+        <tr v-for="(match, index) in filteredSchedule" :key="index" 
+            draggable="true"
+            @dragstart="dragStart(index)" 
+            @drop="drop(index)" 
+            @dragover.prevent>
           <td>{{ index + 1 }}</td>
           <td>{{ match.category }}</td>
           <td><input v-model="match.fighter1" class="form-control form-control-sm"></td>
@@ -81,6 +85,7 @@ export default {
     const participants = computed(() => store.state.participants);
     const selectedCategory = ref("");
     const successMessage = ref("");
+    const dragIndex = ref(null);
 
     // ✅ Уникальные категории (для фильтра)
     const uniqueCategories = computed(() => {
@@ -106,6 +111,21 @@ export default {
       if (!match.result) return "text-muted";
       if (match.result === "draw") return "text-warning";
       return "text-success fw-bold";
+    };
+
+    // ✅ Перетаскивание (Drag & Drop)
+    const dragStart = (index) => {
+      dragIndex.value = index;
+    };
+
+    const drop = (index) => {
+      if (dragIndex.value === null) return;
+
+      const movedMatch = schedule.value.splice(dragIndex.value, 1)[0]; // Убираем матч с прежнего места
+      schedule.value.splice(index, 0, movedMatch); // Вставляем на новое место
+      store.commit("setSchedule", schedule.value); // Сохраняем изменения в Vuex
+
+      dragIndex.value = null;
     };
 
     // ✅ Автоматическая генерация расписания (исправлено!)
@@ -174,11 +194,11 @@ export default {
 
     return { 
       schedule, generateSchedule, saveSchedule: () => store.commit("setSchedule", schedule.value),
-      saveResults: () => store.commit("saveResults", schedule.value), addMatch: () => store.commit("addMatch", {
-        category: "Без категории", fighter1: "", fighter2: "", time: "00:00", result: ""
-      }),
-      removeMatch: (index) => store.commit("removeMatch", index), selectedCategory, uniqueCategories, filteredSchedule, 
-      getMatchStatus, getStatusClass, successMessage
+      saveResults: () => store.commit("saveResults", schedule.value),
+      addMatch: () => store.commit("addMatch", { category: "Без категории", fighter1: "", fighter2: "", time: "00:00", result: "" }),
+      removeMatch: (index) => store.commit("removeMatch", index),
+      selectedCategory, uniqueCategories, filteredSchedule, getMatchStatus, getStatusClass, successMessage,
+      dragStart, drop
     };
   }
 };
