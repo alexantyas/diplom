@@ -144,17 +144,17 @@ export default {
           const workbook = XLSX.read(data, { type: "array" });
           const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
 
-          const headers = sheet[0].map(header => header.trim());
+          const headers = sheet[0].map(header => header.trim().toLowerCase());
           const dataRows = sheet.slice(1);
 
           const importedParticipants = dataRows.map(row => {
             let participant = {};
             headers.forEach((header, index) => {
-              if (header === "Команда") participant.team = row[index]?.trim() || "";
-              if (header === "Участник") participant.name = row[index]?.trim() || "";
-              if (header === "Вес") participant.weight = row[index] ? Number(row[index]) : null;
-              if (header === "Город") participant.city = row[index]?.trim() || "";
-              if (header === "Страна") participant.country = row[index]?.trim() || "";
+              if (header === "команда") participant.team = row[index]?.trim() || "";
+              if (header === "участник") participant.name = row[index]?.trim() || "";
+              if (header === "вес") participant.weight = row[index] ? Number(row[index]) : null;
+              if (header === "город") participant.city = row[index]?.trim() || "";
+              if (header === "страна") participant.country = row[index]?.trim() || "";
             });
             return participant;
           });

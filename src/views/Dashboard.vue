@@ -104,8 +104,8 @@ export default {
 
     // ✅ Функция выхода
     const logout = () => {
-      store.commit("logout"); // Очищаем пользователя в Vuex
-      window.location.href = "/login"; // Перенаправляем на страницу входа
+      store.commit("logout");
+      window.location.href = "/login";
     };
 
     // ✅ Функция скачивания шаблона Excel
@@ -131,7 +131,7 @@ export default {
       alert("✅ Соревнование создано!");
     };
 
-    // ✅ Импорт соревнования
+    // ✅ Импорт соревнования (добавил город и страну участников)
     const importCompetition = async (event) => {
       const file = event.target.files[0];
       if (!file) return alert("Выберите файл");
@@ -141,31 +141,41 @@ export default {
         try {
           const data = new Uint8Array(e.target.result);
           const workbook = XLSX.read(data, { type: "array" });
-          const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+          const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
 
           if (sheet.length === 0) {
             alert("Ошибка: Пустой файл");
             return;
           }
 
-          const teamsSet = new Set();
-          const participants = [];
+          const headers = sheet[0].map(header => header.trim().toLowerCase());
+          const dataRows = sheet.slice(1);
 
-          sheet.forEach(row => {
-            if (row.Команда) teamsSet.add(row.Команда);
-            if (row.Участник) {
-              participants.push({
-                name: row.Участник.trim(),
-                weight: row.Вес ? Number(row.Вес) : null,
-                team: row.Команда ? row.Команда.trim() : "Без команды"
-              });
-            }
+          let participants = [];
+          let teamsSet = new Set();
+
+          dataRows.forEach(row => {
+            let participant = {};
+
+            headers.forEach((header, index) => {
+              if (header.includes("команда")) {
+                participant.team = row[index]?.trim() || "Без команды";
+                teamsSet.add(participant.team);
+              }
+              if (header.includes("участник")) participant.name = row[index]?.trim() || "Без имени";
+              if (header.includes("вес")) participant.weight = row[index] ? Number(row[index]) : null;
+              if (header.includes("город")) participant.city = row[index]?.trim() || "";
+              if (header.includes("страна")) participant.country = row[index]?.trim() || "";
+            });
+
+            participants.push(participant);
           });
 
           importedData.value = {
             teams: Array.from(teamsSet).map(name => ({ name })),
             participants
           };
+
         } catch (error) {
           alert("Ошибка при обработке файла: " + error.message);
         }
@@ -173,7 +183,7 @@ export default {
       reader.readAsArrayBuffer(file);
     };
 
-    // ✅ Подтверждение импорта
+    // ✅ Подтверждение импорта (теперь также сохраняет город и страну участников)
     const confirmImport = () => {
       if (importedData.value) {
         store.commit("setTeams", importedData.value.teams);
@@ -191,3 +201,4 @@ export default {
   }
 };
 </script>
+

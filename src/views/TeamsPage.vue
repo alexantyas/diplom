@@ -17,7 +17,6 @@
         </ul>
       </div>
   
-      <button @click="startCompetition" class="btn btn-primary btn-sm mt-3 w-100">Начать соревнование</button>
     </div>
   </template>
   
