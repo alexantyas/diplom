@@ -63,17 +63,23 @@
               <td>{{ match.category }}</td>
               <td>{{ match.fighter1 }}</td>
               <td>{{ match.fighter2 }}</td>
-              <td>{{ match.time }}</td>
+              <td>
+                <input 
+                  type="time" 
+                  v-model="match.time" 
+                  class="form-control form-control-sm"
+                  @change="updateMatch(match)"
+                >
+              </td>
               <td>{{ match.judge }}</td>
               <td>{{ match.referee }}</td>
               <td>{{ match.tatami }}</td>
               <td>
-                <select v-if="!match.result" v-model="match.result" class="form-select form-select-sm">
+                <select v-model="match.result" class="form-select form-select-sm">
                   <option value="">Не завершен</option>
                   <option :value="match.fighter1">{{ match.fighter1 }}</option>
                   <option :value="match.fighter2">{{ match.fighter2 }}</option>
                 </select>
-                <strong v-else>{{ match.result }}</strong>
               </td>
               <td>
                 <input v-model="match.note" class="form-control form-control-sm">
@@ -82,7 +88,11 @@
                 <input v-model="match.points" type="number" class="form-control form-control-sm">
               </td>
               <td>
-                <select v-model="match.status" class="form-select form-select-sm" @change="updateMatchStatus(match, matchIndex)">
+                <select 
+                  v-model="match.status" 
+                  class="form-select form-select-sm" 
+                  @change="updateMatchStatus(match, getMatchIndex(match))"
+                >
                   <option v-for="option in section.statusOptions" 
                          :key="option.value" 
                          :value="option.value">
@@ -138,6 +148,37 @@ export default {
       filterMatches(schedule.value.filter(match => match.status === 'finished'))
     );
 
+    // Получаем индекс матча в общем списке
+    const getMatchIndex = (match) => {
+      return store.state.schedule.findIndex(m => 
+        m.fighter1 === match.fighter1 && 
+        m.fighter2 === match.fighter2 && 
+        m.category === match.category
+      );
+    };
+
+    // Обновление статуса матча
+    const updateMatchStatus = (match, index) => {
+      if (index === -1) return;
+      
+      const updatedMatch = { ...match };
+      store.commit('updateMatch', { 
+        index, 
+        match: updatedMatch 
+      });
+    };
+
+    // Обновление времени матча
+    const updateMatch = (match) => {
+      const index = getMatchIndex(match);
+      if (index === -1) return;
+      
+      store.commit('updateMatch', { 
+        index, 
+        match 
+      });
+    };
+
     const sections = computed(() => [
       {
         title: 'Текущие схватки',
@@ -146,7 +187,8 @@ export default {
         draggable: true,
         statusOptions: [
           { value: 'current', label: 'В процессе' },
-          { value: 'finished', label: 'Завершен' }
+          { value: 'finished', label: 'Завершен' },
+          { value: 'upcoming', label: 'Вернуть в ожидание' }
         ]
       },
       {
@@ -178,6 +220,7 @@ export default {
     };
 
     const generateSchedule = () => {
+      // Группируем участников по весовым категориям
       const participantsByWeight = {};
       participants.value.forEach(participant => {
         const weight = participant.weight;
@@ -190,52 +233,75 @@ export default {
       let newSchedule = [];
       let matchNumber = 1;
 
+      // Для каждой весовой категории
       Object.entries(participantsByWeight).forEach(([weight, categoryParticipants]) => {
-        const shuffled = [...categoryParticipants].sort(() => Math.random() - 0.5);
+        // Группируем участников по командам
+        const participantsByTeam = {};
+        categoryParticipants.forEach(participant => {
+          if (!participantsByTeam[participant.team]) {
+            participantsByTeam[participant.team] = [];
+          }
+          participantsByTeam[participant.team].push(participant);
+        });
 
-        for (let i = 0; i < shuffled.length - 1; i += 2) {
-          const fighter1 = shuffled[i];
-          const fighter2 = shuffled[i + 1];
-          const randomJudge = judges.value[Math.floor(Math.random() * judges.value.length)];
+        // Создаем массив для жеребьевки
+        let availableParticipants = [...categoryParticipants];
+        
+        while (availableParticipants.length >= 2) {
+          // Берем первого участника
+          const fighter1 = availableParticipants[0];
+          availableParticipants = availableParticipants.filter(p => p !== fighter1);
 
-          newSchedule.push({
-            id: matchNumber++,
-            category: `${weight} кг`,
-            fighter1: fighter1.name,
-            fighter2: fighter2.name,
-            time: '',
-            judge: randomJudge?.name || '',
-            referee: '',
-            tatami: randomJudge?.tatami || '1',
-            result: '',
-            note: '',
-            points: 0,
-            status: 'upcoming' // Все новые схватки имеют статус "предстоящие"
-          });
+          // Ищем подходящего соперника (не из той же команды)
+          const possibleOpponents = availableParticipants.filter(p => p.team !== fighter1.team);
+          
+          if (possibleOpponents.length > 0) {
+            // Случайно выбираем соперника из подходящих кандидатов
+            const randomIndex = Math.floor(Math.random() * possibleOpponents.length);
+            const fighter2 = possibleOpponents[randomIndex];
+            
+            // Удаляем выбранного соперника из доступных участников
+            availableParticipants = availableParticipants.filter(p => p !== fighter2);
+
+            // Случайно выбираем судью
+            const randomJudge = judges.value[Math.floor(Math.random() * judges.value.length)];
+
+            // Создаем схватку
+            newSchedule.push({
+              id: matchNumber++,
+              category: `${weight} кг`,
+              fighter1: fighter1.name,
+              fighter2: fighter2.name,
+              time: '',
+              judge: randomJudge?.name || '',
+              referee: '',
+              tatami: randomJudge?.tatami || '1',
+              result: '',
+              note: '',
+              points: 0,
+              status: 'upcoming'
+            });
+          } else {
+            // Если не нашли подходящего соперника, возвращаем участника обратно в пул
+            availableParticipants.push(fighter1);
+            // Предотвращаем бесконечный цикл, если остались только участники из одной команды
+            if (new Set(availableParticipants.map(p => p.team)).size === 1) {
+              console.warn(`В категории ${weight} кг остались только участники из одной команды`);
+              break;
+            }
+          }
+        }
+
+        // Если остались нераспределенные участники
+        if (availableParticipants.length > 0) {
+          console.warn(`Нераспределенные участники в категории ${weight} кг:`, 
+            availableParticipants.map(p => `${p.name} (${p.team})`).join(', '));
         }
       });
 
+      // Сохраняем сгенерированное расписание
       store.commit('setSchedule', newSchedule);
       alert('Расписание сгенерировано');
-    };
-
-    const updateMatchStatus = (match, index) => {
-      const updatedSchedule = [...schedule.value];
-      let matchIndex;
-
-      // Определяем индекс матча в общем расписании в зависимости от его текущего статуса
-      if (match.status === 'current') {
-        matchIndex = currentMatches.value.indexOf(match);
-      } else if (match.status === 'upcoming') {
-        matchIndex = upcomingMatches.value.indexOf(match);
-      } else if (match.status === 'finished') {
-        matchIndex = finishedMatches.value.indexOf(match);
-      }
-
-      if (matchIndex !== -1) {
-        updatedSchedule[matchIndex] = { ...match };
-        store.commit('setSchedule', updatedSchedule);
-      }
     };
 
     const addMatch = () => {
@@ -290,7 +356,9 @@ export default {
       removeMatch,
       dragStart,
       drop,
-      updateMatchStatus
+      updateMatchStatus,
+      updateMatch,
+      getMatchIndex
     };
   }
 };
@@ -322,6 +390,11 @@ export default {
 /* Стиль для победителя */
 .finished-match strong {
   color: #28a745;
+}
+
+/* Добавляем стиль для поля времени */
+input[type="time"] {
+  min-width: 110px;
 }
 </style>
 
