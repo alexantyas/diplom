@@ -1,16 +1,22 @@
 <template>
   <div>
-    <!-- ✅ Шапка с навигацией -->
+    <!-- Навигация -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container">
         <a class="navbar-brand" href="#">ARENA</a>
         <div class="collapse navbar-collapse">
           <ul class="navbar-nav me-auto">
             <li class="nav-item">
+              <router-link to="/create" class="nav-link">Создание</router-link>
+            </li>
+            <li class="nav-item">
               <router-link to="/dashboard/teams" class="nav-link">Команды</router-link>
             </li>
             <li class="nav-item">
               <router-link to="/dashboard/schedule" class="nav-link">Расписание</router-link>
+            </li>
+            <li class="nav-item">
+              <router-link to="/dashboard/bracket" class="nav-link">Сетка</router-link>
             </li>
             <li class="nav-item">
               <router-link to="/dashboard/judges" class="nav-link">Судейская</router-link>
@@ -27,57 +33,9 @@
       </div>
     </nav>
 
-    <!-- ✅ Основной контент -->
+    <!-- Основной контент -->
     <div class="container-fluid">
-      <div class="row">
-        <!-- ✅ Панель управления соревнованиями -->
-        <div v-if="userRole === 'organizer' || userRole === 'admin'" class="col-md-3 sidebar bg-light p-3">
-          <h6 class="text-center fw-bold">Управление соревнованиями</h6>
-
-          <!-- ✅ Создание соревнования -->
-          <div class="card p-3 shadow-sm mb-3">
-            <h6>Создать соревнование</h6>
-            <input v-model="competition.name" type="text" class="form-control form-control-sm mb-2" placeholder="Название">
-            <input v-model="competition.city" type="text" class="form-control form-control-sm mb-2" placeholder="Город">
-            <select v-model="competition.country" class="form-select form-select-sm mb-2">
-              <option>Россия</option>
-              <option>США</option>
-              <option>Германия</option>
-            </select>
-            <input v-model="competition.startDate" type="date" class="form-control form-control-sm mb-2">
-            <select v-model="competition.type" class="form-select form-select-sm mb-2">
-              <option>Чемпионат континента</option>
-              <option>Международный турнир</option>
-              <option>Национальный турнир</option>
-            </select>
-            <button @click="createCompetition" class="btn btn-primary btn-sm w-100">Создать</button>
-          </div>
-
-          <!-- ✅ Импорт соревнования -->
-          <div class="card p-3 shadow-sm">
-            <h6>Импорт соревнования</h6>
-            <input type="file" @change="importCompetition" accept=".xlsx, .xls" class="form-control form-control-sm mb-2">
-            <button @click="downloadTemplate" class="btn btn-outline-primary btn-sm w-100">📥 Скачать шаблон Excel</button>
-
-            <!-- 🔥 Маленькое окно предпросмотра -->
-            <div v-if="importedData" class="preview-box">
-              <h6 class="text-center fw-bold">📥 Предпросмотр</h6>
-              <p><strong>📌 Команд:</strong> {{ importedData.teams.length }}</p>
-              <p><strong>👥 Участников:</strong> {{ importedData.participants.length }}</p>
-
-              <div class="d-flex justify-content-between mt-2">
-                <button @click="confirmImport" class="btn btn-success btn-sm">✅ Подтвердить</button>
-                <button @click="cancelImport" class="btn btn-danger btn-sm">❌ Отмена</button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- ✅ Основной контент -->
-        <div class="col-md-9 main-content">
-          <router-view />
-        </div>
-      </div>
+      <router-view />
     </div>
   </div>
 </template>

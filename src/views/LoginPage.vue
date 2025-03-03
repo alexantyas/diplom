@@ -48,8 +48,8 @@
         const user = users.find(u => u.username === username.value && u.password === password.value);
   
         if (user) {
-          store.commit('setUser', user); // ✅ Устанавливаем пользователя в Vuex
-          router.push('/dashboard'); // ✅ Переход в Dashboard
+          store.commit('setUser', user);
+          router.push('/create'); // Перенаправляем на страницу создания
         } else {
           errorMessage.value = 'Неверный логин или пароль';
         }

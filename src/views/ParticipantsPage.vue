@@ -134,38 +134,42 @@ export default {
 
     // ✅ Импорт списка участников
     const importParticipants = async (event) => {
-      const file = event.target.files[0];
-      if (!file) return alert("Выберите файл");
+      try {
+        const file = event.target.files[0];
+        if (!file) throw new Error("Файл не выбран");
 
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = new Uint8Array(e.target.result);
-          const workbook = XLSX.read(data, { type: "array" });
-          const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: "array" });
+            const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]], { header: 1 });
 
-          const headers = sheet[0].map(header => header.trim().toLowerCase());
-          const dataRows = sheet.slice(1);
+            const headers = sheet[0].map(header => header.trim().toLowerCase());
+            const dataRows = sheet.slice(1);
 
-          const importedParticipants = dataRows.map(row => {
-            let participant = {};
-            headers.forEach((header, index) => {
-              if (header === "команда") participant.team = row[index]?.trim() || "";
-              if (header === "участник") participant.name = row[index]?.trim() || "";
-              if (header === "вес") participant.weight = row[index] ? Number(row[index]) : null;
-              if (header === "город") participant.city = row[index]?.trim() || "";
-              if (header === "страна") participant.country = row[index]?.trim() || "";
+            const importedParticipants = dataRows.map(row => {
+              let participant = {};
+              headers.forEach((header, index) => {
+                if (header === "команда") participant.team = row[index]?.trim() || "";
+                if (header === "участник") participant.name = row[index]?.trim() || "";
+                if (header === "вес") participant.weight = row[index] ? Number(row[index]) : null;
+                if (header === "город") participant.city = row[index]?.trim() || "";
+                if (header === "страна") participant.country = row[index]?.trim() || "";
+              });
+              return participant;
             });
-            return participant;
-          });
 
-          store.commit("setParticipants", importedParticipants);
-          alert("✅ Участники успешно импортированы!");
-        } catch (error) {
-          alert("Ошибка при обработке файла: " + error.message);
-        }
-      };
-      reader.readAsArrayBuffer(file);
+            store.commit("setParticipants", importedParticipants);
+            alert("✅ Участники успешно импортированы!");
+          } catch (error) {
+            alert("Ошибка при обработке файла: " + error.message);
+          }
+        };
+        reader.readAsArrayBuffer(file);
+      } catch (error) {
+        alert(`Ошибка: ${error.message}`);
+      }
     };
 
     return {

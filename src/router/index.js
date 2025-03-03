@@ -1,6 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import store from '@/store';
-import HomePage from '@/views/HomePage.vue';
 import LoginPage from '@/views/LoginPage.vue';
 import CreateCompetition from '@/views/CreateCompetition.vue';
 import Dashboard from '@/views/Dashboard.vue';
@@ -9,6 +8,7 @@ import SchedulePage from '@/views/SchedulePage.vue';
 import JudgesPage from '@/views/JudgesPage.vue';
 import PrintPage from '@/views/PrintPage.vue';
 import ParticipantsPage from '@/views/ParticipantsPage.vue';
+import BracketPage from '@/views/BracketPage.vue';
 
 const routes = [
   { path: '/login', component: LoginPage },
@@ -19,11 +19,13 @@ const routes = [
     component: Dashboard,
     meta: { requiresAuth: true },
     children: [
+      { path: '', redirect: 'teams' }, // Редирект по умолчанию на команды
       { path: 'teams', component: TeamsPage, meta: { requiresAuth: true, roles: ['organizer'] } },
       { path: 'schedule', component: SchedulePage, meta: { requiresAuth: true } },
-      { path: 'judges', component: JudgesPage, meta: { requiresAuth: true } }, // ✅ Теперь судейская доступна всем
+      { path: 'judges', component: JudgesPage, meta: { requiresAuth: true } },
       { path: 'print', component: PrintPage, meta: { requiresAuth: true, roles: ['organizer', 'secretariat', 'admin'] } },
-      { path: 'participants', component: ParticipantsPage, meta: { requiresAuth: true, roles: ['organizer'] } } 
+      { path: 'participants', component: ParticipantsPage, meta: { requiresAuth: true, roles: ['organizer'] } },
+      { path: 'bracket', component: BracketPage }
     ]
   }
 ];
@@ -36,9 +38,14 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const isAuthenticated = store.getters.isAuthenticated;
   const userRole = store.getters.userRole;
+  const hasCompetition = store.getters.competition;
 
   if (to.meta.requiresAuth && !isAuthenticated) {
     next('/login');
+  } else if (isAuthenticated && to.path === '/login') {
+    next('/create');
+  } else if (isAuthenticated && !hasCompetition && to.path !== '/create') {
+    next('/create');
   } else if (to.meta.roles && !to.meta.roles.includes(userRole)) {
     next('/dashboard');
   } else {

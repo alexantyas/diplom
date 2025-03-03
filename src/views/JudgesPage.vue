@@ -14,7 +14,7 @@
             <th>#</th>
             <th>ФИО</th>
             <th>Квалификация</th>
-            <th>Татами</th>
+            <th>Ковер</th>
             <th>Действия</th>
           </tr>
         </thead>
@@ -171,7 +171,7 @@ export default {
 
     // ✅ Скачивание шаблона списка судей
     const downloadJudgesTemplate = () => {
-      const ws = XLSX.utils.json_to_sheet([{ "ФИО": "", "Квалификация": "Международная", "Татами": 1 }]);
+      const ws = XLSX.utils.json_to_sheet([{ "ФИО": "", "Квалификация": "Международная", "Ковер": 1 }]);
       const wb = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(wb, ws, "Шаблон судей");
       XLSX.writeFile(wb, "Шаблон_судей.xlsx");
