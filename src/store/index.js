@@ -1,4 +1,5 @@
 import { createStore } from 'vuex';
+import { api } from '../mocks/api';
 
 export default createStore({
   state: {
@@ -7,7 +8,11 @@ export default createStore({
     teams: JSON.parse(localStorage.getItem('teams')) || [],
     participants: JSON.parse(localStorage.getItem('participants')) || [],
     schedule: JSON.parse(localStorage.getItem('schedule')) || [],
-    judges: JSON.parse(localStorage.getItem('judges')) || []
+    judges: JSON.parse(localStorage.getItem('judges')) || [],
+    users: [],
+    loading: false,
+    error: null,
+    tournamentResults: null
   },
 
   mutations: {
@@ -73,16 +78,23 @@ export default createStore({
 
     // Управление расписанием
     setSchedule(state, schedule) {
+      console.log('Сохранение расписания в хранилище:', schedule);
       state.schedule = schedule;
       localStorage.setItem('schedule', JSON.stringify(schedule));
+      console.log('Расписание после сохранения:', state.schedule);
+      console.log('Расписание в localStorage:', JSON.parse(localStorage.getItem('schedule')));
     },
     addMatch(state, match) {
+      console.log('Добавление матча в расписание:', match);
       state.schedule.push(match);
       localStorage.setItem('schedule', JSON.stringify(state.schedule));
+      console.log('Расписание после добавления матча:', state.schedule);
     },
     updateMatch(state, { index, match }) {
+      console.log('Обновление матча:', { index, match });
       state.schedule[index] = { ...state.schedule[index], ...match };
       localStorage.setItem('schedule', JSON.stringify(state.schedule));
+      console.log('Расписание после обновления матча:', state.schedule);
     },
     removeMatch(state, index) {
       state.schedule.splice(index, 1);
@@ -105,6 +117,20 @@ export default createStore({
     removeJudge(state, index) {
       state.judges.splice(index, 1);
       localStorage.setItem('judges', JSON.stringify(state.judges));
+    },
+
+    SET_USERS(state, users) {
+      state.users = users;
+    },
+    SET_LOADING(state, status) {
+      state.loading = status;
+    },
+    SET_ERROR(state, error) {
+      state.error = error;
+    },
+    SET_TOURNAMENT_RESULTS(state, results) {
+      state.tournamentResults = results;
+      localStorage.setItem('tournamentResults', JSON.stringify(results));
     }
   },
 
@@ -138,6 +164,56 @@ export default createStore({
         console.error('Ошибка при сохранении результатов:', error);
         return false;
       }
+    },
+
+    async fetchUsers({ commit }) {
+      commit('SET_LOADING', true);
+      try {
+        const users = await api.getUsers();
+        commit('SET_USERS', users);
+        commit('SET_ERROR', null);
+      } catch (error) {
+        commit('SET_ERROR', error.message);
+      } finally {
+        commit('SET_LOADING', false);
+      }
+    },
+    
+    async createUser({ dispatch }, userData) {
+      try {
+        await api.createUser(userData);
+        await dispatch('fetchUsers');
+      } catch (error) {
+        throw error;
+      }
+    },
+    
+    async updateUser({ dispatch }, { id, userData }) {
+      try {
+        await api.updateUser(id, userData);
+        await dispatch('fetchUsers');
+      } catch (error) {
+        throw error;
+      }
+    },
+    
+    async deleteUser({ dispatch }, id) {
+      try {
+        await api.deleteUser(id);
+        await dispatch('fetchUsers');
+      } catch (error) {
+        throw error;
+      }
+    },
+
+    async saveTournamentResults({ commit }, results) {
+      try {
+        commit('SET_TOURNAMENT_RESULTS', results);
+        return true;
+      } catch (error) {
+        console.error('Ошибка при сохранении результатов турнира:', error);
+        return false;
+      }
     }
   },
 
@@ -162,6 +238,10 @@ export default createStore({
     },
     judgesByRole: state => role => {
       return state.judges.filter(j => j.role === role);
-    }
+    },
+    getUsers: state => state.users,
+    isLoading: state => state.loading,
+    getError: state => state.error,
+    getTournamentResults: state => state.tournamentResults
   }
 });
