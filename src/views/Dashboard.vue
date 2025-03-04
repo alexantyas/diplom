@@ -44,10 +44,12 @@
 import { useStore } from "vuex";
 import { computed, ref } from "vue";
 import * as XLSX from "xlsx";
+import { useRouter } from "vue-router";
 
 export default {
   setup() {
     const store = useStore();
+    const router = useRouter();
     const userRole = computed(() => store.getters.userRole);
 
     const competition = ref({
@@ -61,9 +63,17 @@ export default {
     const importedData = ref(null);
 
     // ✅ Функция выхода
-    const logout = () => {
-      store.commit("logout");
-      window.location.href = "/login";
+    const logout = async () => {
+      try {
+        store.commit("logout");
+        // Небольшая задержка для завершения очистки данных
+        await new Promise(resolve => setTimeout(resolve, 100));
+        router.push('/login');
+      } catch (error) {
+        console.error('Ошибка при выходе:', error);
+        // Принудительное перенаправление в случае ошибки
+        window.location.href = '/login';
+      }
     };
 
     // ✅ Функция скачивания шаблона Excel

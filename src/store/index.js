@@ -12,7 +12,8 @@ export default createStore({
     users: [],
     loading: false,
     error: null,
-    tournamentResults: null
+    tournamentResults: null,
+    bracketState: JSON.parse(localStorage.getItem('bracketState')) || null
   },
 
   mutations: {
@@ -131,6 +132,12 @@ export default createStore({
     SET_TOURNAMENT_RESULTS(state, results) {
       state.tournamentResults = results;
       localStorage.setItem('tournamentResults', JSON.stringify(results));
+    },
+    setBracketState(state, bracketState) {
+      // Создаем глубокую копию состояния перед сохранением
+      const stateToSave = JSON.parse(JSON.stringify(bracketState));
+      state.bracketState = stateToSave;
+      localStorage.setItem('bracketState', JSON.stringify(stateToSave));
     }
   },
 

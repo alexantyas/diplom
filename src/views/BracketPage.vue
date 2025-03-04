@@ -644,37 +644,12 @@ export default {
         return;
       }
 
-      // Обновляем результат матча
-      match.winner = winner;
-      match.winnerScore = score;
-
-      // Обновляем матч в расписании
-      const scheduleMatch = store.getters.schedule.find(m => 
-        m.fighter1 === match.participant1.name && 
-        m.fighter2 === match.participant2.name && 
-        m.category === match.category
-      );
-
-      if (scheduleMatch) {
-        const matchIndex = store.getters.schedule.indexOf(scheduleMatch);
-        store.commit('updateMatch', {
-          index: matchIndex,
-          match: {
-            ...scheduleMatch,
-            result: winner.name,
-            points: score,
-            status: 'finished'
-          }
-        });
-      }
-
-      // Определяем следующий этап и индекс матча
       try {
         // Обновляем результат матча в сетке
         match.winner = winner;
         match.winnerScore = score;
 
-        // Находим матч в расписании
+        // Находим матч в расписании и обновляем его
         const scheduleMatch = store.getters.schedule.find(m => 
           m.fighter1 === match.participant1?.name && 
           m.fighter2 === match.participant2?.name && 
@@ -695,21 +670,13 @@ export default {
               stage: getStageString(currentStage)
             }
           });
-        } else {
-          console.warn('Матч не найден в расписании:', match);
         }
 
         // Определяем следующий этап
         const nextStage = getNextStage(currentStage);
         const nextMatchIndex = Math.floor(matchIndex / 2);
 
-        // Получаем пару матчей для определения следующей схватки
-        const currentStageMatches = getCurrentStageMatches(currentStage);
-        const pairIndex = Math.floor(matchIndex / 2) * 2;
-        const firstMatch = currentStageMatches[pairIndex];
-        const secondMatch = currentStageMatches[pairIndex + 1];
-
-        // Обновляем следующий матч в сетке
+        // Получаем следующий матч в зависимости от текущего этапа
         let nextMatch;
         switch (currentStage) {
           case 32:
@@ -736,7 +703,7 @@ export default {
             nextMatch.participant2Score = 0;
           }
 
-          // Если оба участника следующего матча определены, создаем новый матч в расписании
+          // Создаем новый матч в расписании
           if (nextMatch.participant1 && nextMatch.participant2) {
             const newScheduleMatch = {
               fighter1: nextMatch.participant1.name,
@@ -751,19 +718,8 @@ export default {
               points: 0,
               result: null
             };
-
-            // Проверяем, не существует ли уже такой матч
-            const existingMatch = store.getters.schedule.find(m => 
-              m.fighter1 === newScheduleMatch.fighter1 && 
-              m.fighter2 === newScheduleMatch.fighter2 && 
-              m.category === newScheduleMatch.category &&
-              m.stage === newScheduleMatch.stage
-            );
-
-            if (!existingMatch) {
-              // Добавляем новый матч в расписание
-              await store.dispatch('addMatch', newScheduleMatch);
-            }
+            
+            await store.dispatch('addMatch', newScheduleMatch);
           }
         }
 

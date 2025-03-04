@@ -224,9 +224,17 @@ export default {
       router.push('/dashboard/teams');
     };
 
-    const logout = () => {
-      store.commit("logout");
-      router.push('/login');
+    const logout = async () => {
+      try {
+        store.commit("logout");
+        // Небольшая задержка для завершения очистки данных
+        await new Promise(resolve => setTimeout(resolve, 100));
+        router.push('/login');
+      } catch (error) {
+        console.error('Ошибка при выходе:', error);
+        // Принудительное перенаправление в случае ошибки
+        window.location.href = '/login';
+      }
     };
 
     return {
