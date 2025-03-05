@@ -12,7 +12,7 @@ export default createStore({
     users: [],
     loading: false,
     error: null,
-    tournamentResults: null,
+    tournamentResults: JSON.parse(localStorage.getItem('tournamentResults')) || [],
     bracketState: JSON.parse(localStorage.getItem('bracketState')) || null
   },
 
@@ -23,20 +23,18 @@ export default createStore({
       localStorage.setItem('user', JSON.stringify(user));
     },
     logout(state) {
+      // Очищаем все состояния
       state.user = null;
       state.competition = null;
       state.teams = [];
       state.participants = [];
       state.schedule = [];
       state.judges = [];
+      state.tournamentResults = [];
+      state.bracketState = null;
       
       // Очищаем localStorage
-      localStorage.removeItem('user');
-      localStorage.removeItem('competition');
-      localStorage.removeItem('teams');
-      localStorage.removeItem('participants');
-      localStorage.removeItem('schedule');
-      localStorage.removeItem('judges');
+      localStorage.clear(); // Очищаем весь localStorage, включая tournament_brackets
     },
 
     // Управление соревнованием
@@ -93,7 +91,9 @@ export default createStore({
     },
     updateMatch(state, { index, match }) {
       console.log('Обновление матча:', { index, match });
-      state.schedule[index] = { ...state.schedule[index], ...match };
+      if (index >= 0 && index < state.schedule.length) {
+        state.schedule[index] = { ...match };
+      }
       localStorage.setItem('schedule', JSON.stringify(state.schedule));
       console.log('Расписание после обновления матча:', state.schedule);
     },
@@ -138,6 +138,12 @@ export default createStore({
       const stateToSave = JSON.parse(JSON.stringify(bracketState));
       state.bracketState = stateToSave;
       localStorage.setItem('bracketState', JSON.stringify(stateToSave));
+    },
+    clearSchedule(state) {
+      state.schedule = [];
+    },
+    clearTournamentResults(state) {
+      state.tournamentResults = [];
     }
   },
 
@@ -213,14 +219,20 @@ export default createStore({
       }
     },
 
-    async saveTournamentResults({ commit }, results) {
+    async saveTournamentResults({ commit, state }, results) {
       try {
-        commit('SET_TOURNAMENT_RESULTS', results);
+        state.tournamentResults.push(results);
+        commit('SET_TOURNAMENT_RESULTS', state.tournamentResults);
         return true;
       } catch (error) {
         console.error('Ошибка при сохранении результатов турнира:', error);
         return false;
       }
+    },
+
+    clearAllData({ commit }) {
+      commit('clearSchedule');
+      commit('clearTournamentResults');
     }
   },
 
