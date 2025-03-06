@@ -81,7 +81,6 @@ export default createStore({
       state.schedule = schedule;
       localStorage.setItem('schedule', JSON.stringify(schedule));
       console.log('Расписание после сохранения:', state.schedule);
-      console.log('Расписание в localStorage:', JSON.parse(localStorage.getItem('schedule')));
     },
     addMatch(state, match) {
       console.log('Добавление матча в расписание:', match);
@@ -92,10 +91,28 @@ export default createStore({
     updateMatch(state, { index, match }) {
       console.log('Обновление матча:', { index, match });
       if (index >= 0 && index < state.schedule.length) {
-        state.schedule[index] = { ...match };
+        // Проверяем наличие всех необходимых полей
+        const updatedMatch = {
+          ...state.schedule[index], // Сначала берем все существующие поля
+          ...match, // Затем применяем новые значения
+          // Явно указываем важные поля, предпочитая новые значения, но сохраняя старые если новых нет
+          category: match.category || state.schedule[index].category,
+          fighter1: match.fighter1 || state.schedule[index].fighter1,
+          fighter2: match.fighter2 || state.schedule[index].fighter2,
+          stage: match.stage || state.schedule[index].stage,
+          status: match.status || state.schedule[index].status,
+          result: match.result || state.schedule[index].result,
+          points: match.points || state.schedule[index].points,
+          points1: match.points1 || state.schedule[index].points1,
+          points2: match.points2 || state.schedule[index].points2
+        };
+        
+        console.log('Обновленный матч перед сохранением:', updatedMatch);
+        state.schedule[index] = updatedMatch;
+        console.log('Матч после обновления:', state.schedule[index]);
       }
       localStorage.setItem('schedule', JSON.stringify(state.schedule));
-      console.log('Расписание после обновления матча:', state.schedule);
+      console.log('Все расписание после обновления:', state.schedule);
     },
     removeMatch(state, index) {
       state.schedule.splice(index, 1);

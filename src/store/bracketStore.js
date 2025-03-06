@@ -21,6 +21,14 @@ export function useBracketStore() {
     winner: null,
     winnerScore: null
   })
+  const thirdPlaceMatch = ref({
+    participant1: null,
+    participant2: null,
+    participant1Score: 0,
+    participant2Score: 0,
+    winner: null,
+    winnerScore: null
+  })
 
   const weightCategories = computed(() => {
     const categories = new Set(store.getters.schedule.map(match => match.category))
@@ -41,6 +49,14 @@ export function useBracketStore() {
           top8Matches.value = state.top8Matches || []
           top4Matches.value = state.top4Matches || []
           finalMatch.value = state.finalMatch || {
+            participant1: null,
+            participant2: null,
+            participant1Score: 0,
+            participant2Score: 0,
+            winner: null,
+            winnerScore: null
+          }
+          thirdPlaceMatch.value = state.thirdPlaceMatch || {
             participant1: null,
             participant2: null,
             participant1Score: 0,
@@ -71,7 +87,8 @@ export function useBracketStore() {
         top16Matches: top16Matches.value,
         top8Matches: top8Matches.value,
         top4Matches: top4Matches.value,
-        finalMatch: finalMatch.value
+        finalMatch: finalMatch.value,
+        thirdPlaceMatch: thirdPlaceMatch.value
       }
 
       localStorage.setItem(STORAGE_KEY, JSON.stringify(allBrackets))
@@ -82,7 +99,7 @@ export function useBracketStore() {
 
   // Наблюдение за изменениями состояния
   watch(
-    [selectedCategory, top32Matches, top16Matches, top8Matches, top4Matches, finalMatch],
+    [selectedCategory, top32Matches, top16Matches, top8Matches, top4Matches, finalMatch, thirdPlaceMatch],
     () => {
       if (selectedCategory.value) {
         saveState()
@@ -93,35 +110,14 @@ export function useBracketStore() {
 
   const selectCategory = (category) => {
     selectedCategory.value = category
-    const stateLoaded = loadState()
-    if (!stateLoaded) {
-      initializeBracket()
-    }
-  }
-
-  const createMatchFromSchedule = (scheduleMatch) => ({
-    participant1: {
-      name: scheduleMatch.fighter1,
-      weight: scheduleMatch.category,
-      team: scheduleMatch.team1 || ''
-    },
-    participant2: {
-      name: scheduleMatch.fighter2,
-      weight: scheduleMatch.category,
-      team: scheduleMatch.team2 || ''
-    },
-    participant1Score: scheduleMatch.points1 || 0,
-    participant2Score: scheduleMatch.points2 || 0,
-    winner: scheduleMatch.result ? (scheduleMatch.result === scheduleMatch.fighter1 ? 'participant1' : 'participant2') : null,
-    winnerScore: scheduleMatch.points || 0,
-    category: scheduleMatch.category
-  })
-
-  const initializeNextStage = (currentStageMatches, nextStageRef, finalMatchRef = null) => {
-    const nextStageCount = Math.ceil(currentStageMatches.length / 2)
     
-    if (finalMatchRef) {
-      finalMatchRef.value = {
+    // Очищаем все матчи при отмене выбора категории
+    if (!category) {
+      top32Matches.value = []
+      top16Matches.value = []
+      top8Matches.value = []
+      top4Matches.value = []
+      finalMatch.value = {
         participant1: null,
         participant2: null,
         participant1Score: 0,
@@ -129,15 +125,98 @@ export function useBracketStore() {
         winner: null,
         winnerScore: null
       }
-    } else if (nextStageRef) {
-      nextStageRef.value = Array(nextStageCount).fill().map(() => ({
+      thirdPlaceMatch.value = {
         participant1: null,
         participant2: null,
         participant1Score: 0,
         participant2Score: 0,
         winner: null,
         winnerScore: null
-      }))
+      }
+      return
+    }
+
+    const stateLoaded = loadState()
+    if (!stateLoaded) {
+      initializeBracket()
+    }
+  }
+
+  const createMatchFromSchedule = (scheduleMatch) => {
+    return {
+      participant1: scheduleMatch ? {
+        name: scheduleMatch.fighter1,
+        team: scheduleMatch.team1,
+        weight: scheduleMatch.category
+      } : null,
+      participant2: scheduleMatch ? {
+        name: scheduleMatch.fighter2,
+        team: scheduleMatch.team2,
+        weight: scheduleMatch.category
+      } : null,
+      participant1Score: scheduleMatch?.points1 || 0,
+      participant2Score: scheduleMatch?.points2 || 0,
+      winner: scheduleMatch?.result || null,
+      winnerScore: scheduleMatch?.points || null,
+      category: scheduleMatch?.category
+    }
+  }
+
+  const initializeNextStage = (currentStageMatches, nextStageRef, finalMatchRef = null) => {
+    const nextStageMatches = []
+    
+    for (let i = 0; i < currentStageMatches.length; i += 2) {
+      const match1 = currentStageMatches[i]
+      const match2 = i + 1 < currentStageMatches.length ? currentStageMatches[i + 1] : null
+      
+      // Если у участника нет пары, он автоматически проходит дальше
+      if (!match2) {
+        const nextMatch = {
+          participant1: match1.participant1,
+          participant2: null,
+          participant1Score: 0,
+          participant2Score: 0,
+          winner: match1.participant1.name, // Автоматическая победа
+          winnerScore: 0,
+          category: match1.category,
+          status: 'finished'
+        }
+        
+        if (finalMatchRef && currentStageMatches.length === 2) {
+          finalMatchRef.value = nextMatch
+        } else if (nextStageRef) {
+          nextStageMatches.push(nextMatch)
+        }
+        continue
+      }
+      
+      const nextMatch = {
+        participant1: match1?.winner ? {
+          name: match1.winner,
+          team: match1.winner === match1.participant1?.name ? match1.participant1?.team : match1.participant2?.team,
+          weight: match1.category
+        } : null,
+        participant2: match2?.winner ? {
+          name: match2.winner,
+          team: match2.winner === match2.participant1?.name ? match2.participant1?.team : match2.participant2?.team,
+          weight: match2.category
+        } : null,
+        participant1Score: 0,
+        participant2Score: 0,
+        winner: null,
+        winnerScore: null,
+        category: match1?.category
+      }
+      
+      if (finalMatchRef && currentStageMatches.length === 2) {
+        finalMatchRef.value = nextMatch
+      } else if (nextStageRef) {
+        nextStageMatches.push(nextMatch)
+      }
+    }
+    
+    if (nextStageRef && !finalMatchRef) {
+      nextStageRef.value = nextStageMatches
     }
   }
 
@@ -168,9 +247,9 @@ export function useBracketStore() {
         ? schedule.filter(match => match.category === selectedCategory.value)
         : schedule
 
-      const participantCount = new Set(
-        filteredSchedule.flatMap(match => [match.fighter1, match.fighter2])
-      ).size
+      // Определяем начальную стадию на основе количества схваток
+      const matchCount = filteredSchedule.length
+      console.log('Количество схваток в категории:', matchCount)
 
       // Очистка всех матчей
       top32Matches.value = []
@@ -185,32 +264,63 @@ export function useBracketStore() {
         winner: null,
         winnerScore: null
       }
+      thirdPlaceMatch.value = {
+        participant1: null,
+        participant2: null,
+        participant1Score: 0,
+        participant2Score: 0,
+        winner: null,
+        winnerScore: null
+      }
+
+      // Определяем начальную стадию на основе количества схваток
+      let startingStage
+      if (matchCount === 1) {
+        startingStage = 2 // Финал
+      } else if (matchCount <= 2) {
+        startingStage = 4 // Полуфинал (топ 4)
+      } else if (matchCount <= 4) {
+        startingStage = 8 // Четвертьфинал (топ 8)
+      } else if (matchCount <= 8) {
+        startingStage = 16 // 1/8 финала (топ 16)
+      } else if (matchCount <= 16) {
+        startingStage = 32 // 1/16 финала (топ 32)
+      }
+
+      console.log('Начальная стадия турнира:', startingStage)
 
       // Распределение матчей по этапам
-      if (participantCount <= 2) {
-        finalMatch.value = createMatchFromSchedule(filteredSchedule[0])
-      } else if (participantCount <= 4) {
-        top4Matches.value = filteredSchedule.map(match => createMatchFromSchedule(match))
-      } else if (participantCount <= 8) {
-        top8Matches.value = filteredSchedule.map(match => createMatchFromSchedule(match))
-      } else if (participantCount <= 16) {
-        top16Matches.value = filteredSchedule.map(match => createMatchFromSchedule(match))
-      } else {
-        top32Matches.value = filteredSchedule.map(match => createMatchFromSchedule(match))
-      }
-
-      // Инициализация последующих этапов
-      if (top32Matches.value.length > 0) {
-        initializeNextStage(top32Matches.value, top16Matches)
-      }
-      if (top16Matches.value.length > 0) {
-        initializeNextStage(top16Matches.value, top8Matches)
-      }
-      if (top8Matches.value.length > 0) {
-        initializeNextStage(top8Matches.value, top4Matches)
-      }
-      if (top4Matches.value.length > 0 && !finalMatch.value.participant1) {
-        initializeNextStage(top4Matches.value, null, finalMatch)
+      switch (startingStage) {
+        case 32:
+          // Начинаем с топ 32 (1/16 финала)
+          top32Matches.value = filteredSchedule.map(match => createMatchFromSchedule(match))
+          initializeNextStage(top32Matches.value, top16Matches) // создаем топ 16
+          initializeNextStage(top16Matches.value, top8Matches) // создаем топ 8
+          initializeNextStage(top8Matches.value, top4Matches) // создаем топ 4
+          initializeNextStage(top4Matches.value, null, finalMatch) // создаем финал
+          break
+        case 16:
+          // Начинаем с топ 16 (1/8 финала)
+          top16Matches.value = filteredSchedule.map(match => createMatchFromSchedule(match))
+          initializeNextStage(top16Matches.value, top8Matches) // создаем топ 8
+          initializeNextStage(top8Matches.value, top4Matches) // создаем топ 4
+          initializeNextStage(top4Matches.value, null, finalMatch) // создаем финал
+          break
+        case 8:
+          // Начинаем с топ 8 (1/4 финала)
+          top8Matches.value = filteredSchedule.map(match => createMatchFromSchedule(match))
+          initializeNextStage(top8Matches.value, top4Matches) // создаем топ 4
+          initializeNextStage(top4Matches.value, null, finalMatch) // создаем финал
+          break
+        case 4:
+          // Начинаем с топ 4 (полуфинал)
+          top4Matches.value = filteredSchedule.map(match => createMatchFromSchedule(match))
+          initializeNextStage(top4Matches.value, null, finalMatch) // создаем финал
+          break
+        case 2:
+          // Только финал
+          finalMatch.value = createMatchFromSchedule(filteredSchedule[0])
+          break
       }
 
       // Сохраняем состояние после инициализации
@@ -225,13 +335,50 @@ export function useBracketStore() {
     }
   }
 
+  const isValidMatch = (participant1, participant2) => {
+    return participant1 && 
+           participant2 && 
+           participant1.name !== participant2.name && // Проверка на разных участников
+           participant1.name && 
+           participant2.name;
+  }
+
+  const createScheduleMatch = (participant1, participant2, category, stage) => {
+    // Проверяем валидность матча
+    if (!isValidMatch(participant1, participant2)) {
+      console.warn('Попытка создать невалидный матч:', { participant1, participant2 });
+      return null;
+    }
+
+    return {
+      fighter1: participant1.name,
+      fighter2: participant2.name,
+      category: category,
+      team1: participant1.team,
+      team2: participant2.team,
+      status: 'upcoming',
+      stage: getStageString(stage),
+      points1: 0,
+      points2: 0,
+      points: 0,
+      result: null,
+      time: '',
+      judge: '',
+      referee: '',
+      tatami: ''
+    }
+  }
+
   const setWinner = async ({ match, winner, score, stage, matchIndex }) => {
     try {
+      console.log('Установка победителя:', { stage, matchIndex, winner })
+      
       // Обновляем текущий матч
-      match.winner = winner
+      match.winner = winner.name // Изменено: сохраняем имя победителя
       match.winnerScore = score
+      match.status = 'finished'
 
-      // Обновляем финальный матч, если это он
+      // Обновляем финальный матч или матч за третье место
       if (stage === 2) {
         finalMatch.value = {
           ...match,
@@ -239,80 +386,222 @@ export function useBracketStore() {
           participant2: match.participant2,
           participant1Score: match.participant1Score,
           participant2Score: match.participant2Score,
-          winner,
-          winnerScore: score
+          winner: winner.name, // Изменено: сохраняем имя победителя
+          winnerScore: score,
+          category: match.category,
+          status: 'finished'
         }
       }
 
-      const scheduleMatch = store.getters.schedule.find(m => 
+      // Если это полуфинал, создаем матч за 3-е место между проигравшими
+      if (stage === 4) {
+        const loser = match.participant1.name === winner.name ? match.participant2 : match.participant1
+        
+        if (!thirdPlaceMatch.value.participant1) {
+          thirdPlaceMatch.value.participant1 = loser
+        } else {
+          thirdPlaceMatch.value.participant2 = loser
+          thirdPlaceMatch.value.category = match.category
+        }
+
+        if (thirdPlaceMatch.value.participant1 && thirdPlaceMatch.value.participant2) {
+          const newThirdPlaceMatch = {
+            fighter1: thirdPlaceMatch.value.participant1.name,
+            fighter2: thirdPlaceMatch.value.participant2.name,
+            category: match.category,
+            team1: thirdPlaceMatch.value.participant1.team || '',
+            team2: thirdPlaceMatch.value.participant2.team || '',
+            status: 'upcoming',
+            stage: '3rd place',
+            points1: 0,
+            points2: 0,
+            points: 0,
+            result: null,
+            time: '--:--',
+            judge: '',
+            referee: '',
+            tatami: '1'
+          }
+          store.commit('addMatch', newThirdPlaceMatch)
+        }
+      }
+
+      // Обновляем существующий матч в расписании
+      const scheduleMatches = store.state.schedule.filter(m => 
         m.fighter1 === match.participant1?.name && 
         m.fighter2 === match.participant2?.name && 
         m.category === match.category
       )
 
-      if (scheduleMatch) {
-        const matchIndex = store.getters.schedule.indexOf(scheduleMatch)
-        await store.commit('updateMatch', {
-          index: matchIndex,
-          match: {
-            ...scheduleMatch,
-            result: winner.name,
-            points: score,
-            points1: match.participant1Score,
-            points2: match.participant2Score,
-            status: 'finished',
-            stage: getStageString(stage)
-          }
-        })
+      if (scheduleMatches.length > 0) {
+        const scheduleMatchIndex = store.state.schedule.indexOf(scheduleMatches[0])
+        const updatedMatch = {
+          ...scheduleMatches[0],
+          result: winner.name,
+          points: score,
+          points1: match.participant1Score,
+          points2: match.participant2Score,
+          status: 'finished',
+          stage: getStageString(stage),
+          category: match.category,
+          fighter1: match.participant1.name,
+          fighter2: match.participant2.name
+        }
+        
+        store.commit('removeMatch', scheduleMatchIndex)
+        store.commit('addMatch', updatedMatch)
+      } else {
+        const newMatch = {
+          fighter1: match.participant1.name,
+          fighter2: match.participant2.name,
+          category: match.category,
+          team1: match.participant1.team || '',
+          team2: match.participant2.team || '',
+          status: 'finished',
+          stage: getStageString(stage),
+          points1: match.participant1Score,
+          points2: match.participant2Score,
+          points: score,
+          result: winner.name,
+          time: '--:--',
+          judge: '',
+          referee: '',
+          tatami: '1'
+        }
+        store.commit('addMatch', newMatch)
       }
 
-      // Обновление следующего этапа
-      const nextMatchIndex = Math.floor(matchIndex / 2)
+      // Определяем следующую стадию и добавляем победителя
+      let nextStageMatches
       let nextMatch
 
       switch (stage) {
         case 32:
-          nextMatch = top16Matches.value[nextMatchIndex]
+          nextStageMatches = top16Matches
           break
         case 16:
-          nextMatch = top8Matches.value[nextMatchIndex]
+          nextStageMatches = top8Matches
           break
         case 8:
-          nextMatch = top4Matches.value[nextMatchIndex]
+          nextStageMatches = top4Matches
           break
         case 4:
-          nextMatch = finalMatch.value
+          nextMatch = finalMatch
           break
       }
 
-      if (nextMatch && stage !== 2) {
-        if (!nextMatch.participant1) {
-          nextMatch.participant1 = { ...winner }
-          nextMatch.participant1Score = 0
-        } else {
-          nextMatch.participant2 = { ...winner }
-          nextMatch.participant2Score = 0
-        }
+      // Добавляем победителя в следующую стадию
+      if (stage !== 2) {
+        const nextMatchIndex = Math.floor(matchIndex / 2)
+        console.log('Следующий матч:', { nextMatchIndex, stage })
 
-        if (nextMatch.participant1 && nextMatch.participant2) {
-          const newScheduleMatch = {
-            fighter1: nextMatch.participant1.name,
-            fighter2: nextMatch.participant2.name,
-            category: match.category,
-            team1: nextMatch.participant1.team,
-            team2: nextMatch.participant2.team,
-            status: 'upcoming',
-            stage: getStageString(stage / 2),
-            points1: 0,
-            points2: 0,
-            points: 0,
-            result: null
+        if (nextStageMatches) {
+          // Для всех стадий кроме полуфинала
+          if (!nextStageMatches.value[nextMatchIndex]) {
+            nextStageMatches.value[nextMatchIndex] = {
+              participant1: null,
+              participant2: null,
+              participant1Score: 0,
+              participant2Score: 0,
+              winner: null,
+              winnerScore: null,
+              category: match.category
+            }
           }
           
-          await store.dispatch('addMatch', newScheduleMatch)
+          const nextMatch = nextStageMatches.value[nextMatchIndex]
+          if (!nextMatch.participant1) {
+            nextMatch.participant1 = {
+              name: winner.name,
+              team: winner.team,
+              weight: match.category
+            }
+          } else {
+            nextMatch.participant2 = {
+              name: winner.name,
+              team: winner.team,
+              weight: match.category
+            }
+          }
+
+          // Создаем новый матч в расписании
+          if (nextMatch.participant1 && nextMatch.participant2) {
+            const existingMatch = store.state.schedule.find(m =>
+              m.fighter1 === nextMatch.participant1.name &&
+              m.fighter2 === nextMatch.participant2.name &&
+              m.category === match.category
+            )
+
+            if (!existingMatch) {
+              const newScheduleMatch = {
+                fighter1: nextMatch.participant1.name,
+                fighter2: nextMatch.participant2.name,
+                category: match.category,
+                team1: nextMatch.participant1.team || '',
+                team2: nextMatch.participant2.team || '',
+                status: 'upcoming',
+                stage: getStageString(stage / 2),
+                points1: 0,
+                points2: 0,
+                points: 0,
+                result: null,
+                time: '--:--',
+                judge: '',
+                referee: '',
+                tatami: '1'
+              }
+              store.commit('addMatch', newScheduleMatch)
+            }
+          }
+        } else if (nextMatch) {
+          // Для полуфинала (переход в финал)
+          if (!nextMatch.value.participant1) {
+            nextMatch.value.participant1 = {
+              name: winner.name,
+              team: winner.team,
+              weight: match.category
+            }
+          } else {
+            nextMatch.value.participant2 = {
+              name: winner.name,
+              team: winner.team,
+              weight: match.category
+            }
+          }
+
+          // Создаем финальный матч в расписании
+          if (nextMatch.value.participant1 && nextMatch.value.participant2) {
+            const existingMatch = store.state.schedule.find(m =>
+              m.fighter1 === nextMatch.value.participant1.name &&
+              m.fighter2 === nextMatch.value.participant2.name &&
+              m.category === match.category
+            )
+
+            if (!existingMatch) {
+              const newFinalMatch = {
+                fighter1: nextMatch.value.participant1.name,
+                fighter2: nextMatch.value.participant2.name,
+                category: match.category,
+                team1: nextMatch.value.participant1.team || '',
+                team2: nextMatch.value.participant2.team || '',
+                status: 'upcoming',
+                stage: 'final',
+                points1: 0,
+                points2: 0,
+                points: 0,
+                result: null,
+                time: '--:--',
+                judge: '',
+                referee: '',
+                tatami: '1'
+              }
+              store.commit('addMatch', newFinalMatch)
+            }
+          }
         }
       }
 
+      // Сохраняем результаты финального матча
       if (stage === 2) {
         try {
           await store.dispatch('saveTournamentResults', {
@@ -324,7 +613,8 @@ export function useBracketStore() {
               top16: top16Matches.value,
               top8: top8Matches.value,
               top4: top4Matches.value,
-              final: finalMatch.value
+              final: finalMatch.value,
+              thirdPlace: thirdPlaceMatch.value
             }
           })
         } catch (err) {
@@ -333,8 +623,24 @@ export function useBracketStore() {
         }
       }
 
-      // Сохраняем состояние после любых изменений
+      // Обновляем статусы всех матчей
+      store.state.schedule.forEach((m, idx) => {
+        if (m.result) {
+          store.commit('updateMatch', {
+            index: idx,
+            match: { ...m, status: 'finished' }
+          })
+        }
+      })
+
+      // Сохраняем состояние
       saveState()
+      
+      console.log('Обновление завершено:', {
+        stage,
+        winner: winner.name,
+        nextStage: stage / 2
+      })
     } catch (err) {
       error.value = 'Ошибка при обновлении матча'
       console.error(err)
@@ -351,6 +657,14 @@ export function useBracketStore() {
       top8Matches.value = []
       top4Matches.value = []
       finalMatch.value = {
+        participant1: null,
+        participant2: null,
+        participant1Score: 0,
+        participant2Score: 0,
+        winner: null,
+        winnerScore: null
+      }
+      thirdPlaceMatch.value = {
         participant1: null,
         participant2: null,
         participant1Score: 0,
@@ -376,6 +690,7 @@ export function useBracketStore() {
     top8Matches,
     top4Matches,
     finalMatch,
+    thirdPlaceMatch,
     initializeBracket,
     setWinner,
     selectCategory,

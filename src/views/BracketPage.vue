@@ -16,52 +16,68 @@
       {{ error }}
     </div>
 
+    <div v-else-if="!selectedCategory" class="text-center my-4">
+      <h4>Выберите весовую категорию для отображения сетки</h4>
+    </div>
+
     <div v-else class="bracket-container">
-      <bracket-round
-        v-if="filteredTop32Matches.length"
-        title="1/16 финала"
-        :matches="filteredTop32Matches"
-        :stage="32"
-        @winner-selected="setWinner"
-      />
+      <div class="main-bracket">
+        <bracket-round
+          v-if="shouldShowStage(32)"
+          title="1/16 финала"
+          :matches="filteredTop32Matches"
+          :stage="32"
+          @winner-selected="setWinner"
+        />
 
-      <bracket-round
-        v-if="filteredTop16Matches.length"
-        title="1/8 финала"
-        :matches="filteredTop16Matches"
-        :stage="16"
-        @winner-selected="setWinner"
-      />
+        <bracket-round
+          v-if="shouldShowStage(16)"
+          title="1/8 финала"
+          :matches="filteredTop16Matches"
+          :stage="16"
+          @winner-selected="setWinner"
+        />
 
-      <bracket-round
-        v-if="filteredTop8Matches.length"
-        title="1/4 финала"
-        :matches="filteredTop8Matches"
-        :stage="8"
-        @winner-selected="setWinner"
-      />
+        <bracket-round
+          v-if="shouldShowStage(8)"
+          title="1/4 финала"
+          :matches="filteredTop8Matches"
+          :stage="8"
+          @winner-selected="setWinner"
+        />
 
-      <bracket-round
-        v-if="filteredTop4Matches.length"
-        title="1/2 финала"
-        :matches="filteredTop4Matches"
-        :stage="4"
-        @winner-selected="setWinner"
-      />
+        <bracket-round
+          v-if="shouldShowStage(4)"
+          title="1/2 финала"
+          :matches="filteredTop4Matches"
+          :stage="4"
+          @winner-selected="setWinner"
+        />
 
-      <bracket-round
-        title="ФИНАЛ"
-        :matches="[finalMatch]"
-        :stage="2"
-        :is-final="true"
-        @winner-selected="setWinner"
-      />
+        <bracket-round
+          v-if="shouldShowStage(2)"
+          title="ФИНАЛ"
+          :matches="[finalMatch]"
+          :stage="2"
+          :is-final="true"
+          @winner-selected="setWinner"
+        />
+      </div>
+
+      <div v-if="shouldShowThirdPlace" class="third-place-match">
+        <bracket-round
+          title="Матч за 3-е место"
+          :matches="[thirdPlaceMatch]"
+          :stage="3"
+          @winner-selected="setWinner"
+        />
+      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useBracketStore } from '@/store/bracketStore'
 import CategorySelector from '@/components/bracket/CategorySelector.vue'
 import BracketRound from '@/components/bracket/BracketRound.vue'
@@ -83,13 +99,39 @@ export default {
       top8Matches,
       top4Matches,
       finalMatch,
+      thirdPlaceMatch,
       initializeBracket,
       setWinner,
       selectCategory
     } = useBracketStore()
 
+    const shouldShowThirdPlace = computed(() => {
+      return thirdPlaceMatch.participant1 && thirdPlaceMatch.participant2
+    })
+
+    const shouldShowStage = (stage) => {
+      switch (stage) {
+        case 32:
+          return filteredTop32Matches.value.length > 0
+        case 16:
+          return filteredTop16Matches.value.length > 0 || filteredTop32Matches.value.length > 0
+        case 8:
+          return filteredTop8Matches.value.length > 0 || filteredTop16Matches.value.length > 0 || filteredTop32Matches.value.length > 0
+        case 4:
+          return filteredTop4Matches.value.length > 0 || filteredTop8Matches.value.length > 0 || filteredTop16Matches.value.length > 0 || filteredTop32Matches.value.length > 0
+        case 2:
+          return (finalMatch.value.participant1 && finalMatch.value.participant2) || 
+                 filteredTop4Matches.value.length > 0 || 
+                 filteredTop8Matches.value.length > 0 || 
+                 filteredTop16Matches.value.length > 0 || 
+                 filteredTop32Matches.value.length > 0
+        default:
+          return false
+      }
+    }
+
     const filteredTop32Matches = computed(() => {
-      if (!selectedCategory.value) return top32Matches.value
+      if (!selectedCategory.value) return []
       return top32Matches.value.filter(match => 
         match.participant1?.weight === selectedCategory.value ||
         match.participant2?.weight === selectedCategory.value
@@ -97,7 +139,7 @@ export default {
     })
 
     const filteredTop16Matches = computed(() => {
-      if (!selectedCategory.value) return top16Matches.value
+      if (!selectedCategory.value) return []
       return top16Matches.value.filter(match => 
         match.participant1?.weight === selectedCategory.value ||
         match.participant2?.weight === selectedCategory.value
@@ -105,7 +147,7 @@ export default {
     })
 
     const filteredTop8Matches = computed(() => {
-      if (!selectedCategory.value) return top8Matches.value
+      if (!selectedCategory.value) return []
       return top8Matches.value.filter(match => 
         match.participant1?.weight === selectedCategory.value ||
         match.participant2?.weight === selectedCategory.value
@@ -113,15 +155,11 @@ export default {
     })
 
     const filteredTop4Matches = computed(() => {
-      if (!selectedCategory.value) return top4Matches.value
+      if (!selectedCategory.value) return []
       return top4Matches.value.filter(match => 
         match.participant1?.weight === selectedCategory.value ||
         match.participant2?.weight === selectedCategory.value
       )
-    })
-
-    onMounted(() => {
-      initializeBracket()
     })
 
     return {
@@ -134,8 +172,11 @@ export default {
       filteredTop8Matches,
       filteredTop4Matches,
       finalMatch,
+      thirdPlaceMatch,
       selectCategory,
-      setWinner
+      setWinner,
+      shouldShowStage,
+      shouldShowThirdPlace
     }
   }
 }
@@ -148,13 +189,25 @@ export default {
 
 .bracket-container {
   display: flex;
+  flex-direction: column;
   gap: 30px;
-  overflow-x: auto;
   padding: 20px 0;
 }
 
+.main-bracket {
+  display: flex;
+  gap: 30px;
+  overflow-x: auto;
+}
+
+.third-place-match {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 2px solid #eee;
+}
+
 @media (max-width: 768px) {
-  .bracket-container {
+  .main-bracket {
     flex-direction: column;
     gap: 20px;
   }

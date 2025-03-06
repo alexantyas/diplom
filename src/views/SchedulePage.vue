@@ -38,6 +38,7 @@
           <thead class="table-light">
             <tr>
               <th>#</th>
+              <th>Этап</th>
               <th>Весовая категория</th>
               <th>Спортсмен 1</th>
               <th>Спортсмен 2</th>
@@ -54,15 +55,32 @@
           <tbody>
             <tr v-for="(match, matchIndex) in section.matches" 
                 :key="matchIndex"
-                :class="section.rowClass"
-                :draggable="section.draggable"
-                @dragstart="section.draggable && dragStart(matchIndex)"
-                @drop="section.draggable && drop(matchIndex)"
+                :class="[
+                  section.rowClass,
+                  { 'bracket-match': isBracketMatch(match) }
+                ]"
+                :draggable="section.draggable && !isBracketMatch(match)"
+                @dragstart="section.draggable && !isBracketMatch(match) && dragStart(matchIndex)"
+                @drop="section.draggable && !isBracketMatch(match) && drop(matchIndex)"
                 @dragover.prevent>
               <td>{{ matchIndex + 1 }}</td>
-              <td>{{ match.category }}</td>
-              <td>{{ match.fighter1 }}</td>
-              <td>{{ match.fighter2 }}</td>
+              <td>
+                <span v-if="match.stage" class="badge bg-info">{{ match.stage }}</span>
+                <span v-else>-</span>
+              </td>
+              <td>
+                <span class="badge bg-secondary">{{ match.category }}</span>
+              </td>
+              <td>
+                <span :class="{ 'text-success fw-bold': match.result === match.fighter1 }">
+                  {{ match.fighter1 }}
+                </span>
+              </td>
+              <td>
+                <span :class="{ 'text-success fw-bold': match.result === match.fighter2 }">
+                  {{ match.fighter2 }}
+                </span>
+              </td>
               <td>
                 <input 
                   type="time" 
@@ -71,24 +89,72 @@
                   @change="updateMatch(match)"
                 >
               </td>
-              <td>{{ match.judge }}</td>
-              <td>{{ match.referee }}</td>
-              <td>{{ match.tatami }}</td>
               <td>
-                <select v-model="match.result" class="form-select form-select-sm">
+                <select 
+                  v-model="match.judge" 
+                  class="form-select form-select-sm"
+                  @change="updateMatch(match)"
+                >
+                  <option value="">Выберите судью</option>
+                  <option v-for="judge in judges" :key="judge.name" :value="judge.name">
+                    {{ judge.name }}
+                  </option>
+                </select>
+              </td>
+              <td>
+                <select 
+                  v-model="match.referee" 
+                  class="form-select form-select-sm"
+                  @change="updateMatch(match)"
+                >
+                  <option value="">Выберите рефери</option>
+                  <option v-for="judge in judges" :key="judge.name" :value="judge.name">
+                    {{ judge.name }}
+                  </option>
+                </select>
+              </td>
+              <td>
+                <input 
+                  v-model="match.tatami" 
+                  class="form-control form-control-sm"
+                  @change="updateMatch(match)"
+                >
+              </td>
+              <td>
+                <select 
+                  v-if="!isBracketMatch(match) || !match.result"
+                  v-model="match.result" 
+                  class="form-select form-select-sm"
+                  @change="updateMatch(match)"
+                >
                   <option value="">Не завершен</option>
                   <option :value="match.fighter1">{{ match.fighter1 }}</option>
                   <option :value="match.fighter2">{{ match.fighter2 }}</option>
                 </select>
+                <span v-else class="text-success">{{ match.result }}</span>
               </td>
               <td>
-                <input v-model="match.note" class="form-control form-control-sm">
+                <input 
+                  v-if="!isBracketMatch(match)"
+                  v-model="match.note" 
+                  class="form-control form-control-sm"
+                  @change="updateMatch(match)"
+                >
+                <span v-else>{{ match.note || '-' }}</span>
               </td>
               <td>
-                <input v-model="match.points" type="number" class="form-control form-control-sm">
+                <input 
+                  v-if="!isBracketMatch(match) || !match.result"
+                  v-model="match.points" 
+                  type="number" 
+                  class="form-control form-control-sm"
+                  @change="updateMatch(match)"
+                >
+                <span v-else>{{ match.points }}</span>
               </td>
               <td>
                 <select 
+                  v-if="!isBracketMatch(match) || !match.result"
                   v-model="match.status" 
                   class="form-select form-select-sm" 
                   @change="updateMatchStatus(match, getMatchIndex(match))"
@@ -99,6 +165,7 @@
                     {{ option.label }}
                   </option>
                 </select>
+                <span v-else class="badge bg-success">Завершен</span>
               </td>
             </tr>
           </tbody>
@@ -127,7 +194,7 @@ export default {
       return Array.from(categories);
     });
 
-    // Обновленная функция фильтрации без учета рефери
+    // Обновленная функция фильтрации
     const filterMatches = (matches) => {
       return matches.filter(match => {
         const categoryMatch = !selectedCategory.value || match.category === selectedCategory.value;
@@ -136,16 +203,15 @@ export default {
       });
     };
 
-    const currentMatches = computed(() => 
-      filterMatches(schedule.value.filter(match => match.status === 'current'))
-    );
-
+    // Обновленные вычисляемые свойства для разных статусов матчей
     const upcomingMatches = computed(() => 
       filterMatches(schedule.value.filter(match => match.status === 'upcoming'))
+        .sort((a, b) => a.time.localeCompare(b.time))
     );
 
     const finishedMatches = computed(() => 
       filterMatches(schedule.value.filter(match => match.status === 'finished'))
+        .sort((a, b) => b.time.localeCompare(a.time))
     );
 
     // Получаем индекс матча в общем списке
@@ -153,7 +219,8 @@ export default {
       return store.state.schedule.findIndex(m => 
         m.fighter1 === match.fighter1 && 
         m.fighter2 === match.fighter2 && 
-        m.category === match.category
+        m.category === match.category &&
+        m.stage === match.stage // Добавляем проверку этапа
       );
     };
 
@@ -162,10 +229,34 @@ export default {
       if (index === -1) return;
       
       const updatedMatch = { ...match };
+      
+      // Проверяем, не является ли матч частью турнирной сетки
+      const isBracketMatch = match.stage && ['1/16', '1/8', '1/4', '1/2', 'final'].includes(match.stage);
+      
+      // Если матч является частью турнирной сетки и имеет результат,
+      // не позволяем менять его статус обратно
+      if (isBracketMatch && match.result) {
+        console.warn('Нельзя изменить статус завершенного матча турнирной сетки');
+        return;
+      }
+
+      // Сохраняем все данные матча при изменении статуса
       store.commit('updateMatch', { 
         index, 
-        match: updatedMatch 
+        match: {
+          ...updatedMatch,
+          category: updatedMatch.category,
+          stage: updatedMatch.stage,
+          fighter1: updatedMatch.fighter1,
+          fighter2: updatedMatch.fighter2,
+          result: updatedMatch.result,
+          points: updatedMatch.points,
+          status: updatedMatch.status
+        }
       });
+
+      // После обновления статуса сохраняем все расписание
+      saveSchedule();
     };
 
     // Обновление времени матча
@@ -173,24 +264,34 @@ export default {
       const index = getMatchIndex(match);
       if (index === -1) return;
       
-      store.commit('updateMatch', { 
-        index, 
-        match 
-      });
+      // Проверяем, не является ли матч частью турнирной сетки
+      const isBracketMatch = match.stage && ['1/16', '1/8', '1/4', '1/2', 'final'].includes(match.stage);
+      
+      // Для матчей турнирной сетки сохраняем все поля
+      if (isBracketMatch) {
+        const updatedMatch = {
+          ...match,
+          category: match.category,    // Явно сохраняем категорию
+          stage: match.stage,          // Явно сохраняем этап
+          fighter1: match.fighter1,    // Явно сохраняем бойцов
+          fighter2: match.fighter2,
+          result: match.result,        // Явно сохраняем результат
+          points: match.points,        // Явно сохраняем очки
+          time: match.time,
+          judge: match.judge,
+          referee: match.referee,
+          tatami: match.tatami
+        };
+        store.commit('updateMatch', { index, match: updatedMatch });
+      } else {
+        store.commit('updateMatch', { index, match });
+      }
+
+      // После любого обновления сохраняем все расписание
+      saveSchedule();
     };
 
     const sections = computed(() => [
-      {
-        title: 'Текущие схватки',
-        matches: currentMatches.value,
-        rowClass: 'current-match',
-        draggable: true,
-        statusOptions: [
-          { value: 'current', label: 'В процессе' },
-          { value: 'finished', label: 'Завершен' },
-          { value: 'upcoming', label: 'Вернуть в ожидание' }
-        ]
-      },
       {
         title: 'Предстоящие схватки',
         matches: upcomingMatches.value,
@@ -198,7 +299,7 @@ export default {
         draggable: false,
         statusOptions: [
           { value: 'upcoming', label: 'Не начат' },
-          { value: 'current', label: 'Начать' }
+          { value: 'finished', label: 'Завершен' }
         ]
       },
       {
@@ -208,7 +309,7 @@ export default {
         draggable: false,
         statusOptions: [
           { value: 'finished', label: 'Завершен' },
-          { value: 'current', label: 'Вернуть в текущие' }
+          { value: 'upcoming', label: 'Вернуть в ожидание' }
         ]
       }
     ]);
@@ -305,6 +406,11 @@ export default {
     };
 
     const addMatch = () => {
+      if (!selectedCategory.value) {
+        alert('Пожалуйста, выберите весовую категорию');
+        return;
+      }
+      
       store.commit('addMatch', {
         category: selectedCategory.value,
         fighter1: '',
@@ -321,12 +427,19 @@ export default {
     };
 
     const saveSchedule = () => {
-      store.commit('setSchedule', [...currentMatches.value, ...upcomingMatches.value]);
-      alert('Расписание сохранено');
+      // Сохраняем все матчи
+      store.commit('setSchedule', [
+        ...upcomingMatches.value,
+        ...finishedMatches.value
+      ]);
     };
 
     const saveResults = () => {
-      store.commit('saveResults', [...currentMatches.value, ...upcomingMatches.value]);
+      // Сохраняем все матчи
+      store.commit('saveResults', [
+        ...upcomingMatches.value,
+        ...finishedMatches.value
+      ]);
       alert('Результаты сохранены');
     };
 
@@ -340,6 +453,11 @@ export default {
 
     const drop = (index) => {
       // Логика завершения перетаскивания
+    };
+
+    // Добавляем функцию проверки матча турнирной сетки
+    const isBracketMatch = (match) => {
+      return match.stage && ['1/16', '1/8', '1/4', '1/2', 'final'].includes(match.stage);
     };
 
     return {
@@ -358,7 +476,8 @@ export default {
       drop,
       updateMatchStatus,
       updateMatch,
-      getMatchIndex
+      getMatchIndex,
+      isBracketMatch
     };
   }
 };
@@ -387,14 +506,25 @@ export default {
   background-color: rgba(198, 239, 206, 0.5);
 }
 
+/* Стиль для матчей турнирной сетки */
+.bracket-match {
+  background-color: rgba(207, 226, 255, 0.5);
+}
+
 /* Стиль для победителя */
-.finished-match strong {
-  color: #28a745;
+.text-success.fw-bold {
+  font-weight: 600;
 }
 
 /* Добавляем стиль для поля времени */
 input[type="time"] {
   min-width: 110px;
+}
+
+/* Стили для значков */
+.badge {
+  font-size: 0.85em;
+  padding: 0.35em 0.65em;
 }
 </style>
 
