@@ -10,6 +10,9 @@
         <input v-model="user.weightCategory" class="form-control mb-2" placeholder="Весовая категория" />
         <input v-model="user.phone" class="form-control mb-2" placeholder="Телефон" />
         <input v-model="user.email" class="form-control mb-2" placeholder="Электронная почта" />
+        <input v-model="user.username" class="form-control mb-2" placeholder="Логин" required />
+        <input v-model="user.password" class="form-control mb-2" placeholder="Пароль" type="password" required />
+
         <div class="form-check mb-3">
           <input type="checkbox" class="form-check-input" v-model="consent" required />
           <label class="form-check-label">Согласие на обработку персональных данных</label>
@@ -36,7 +39,7 @@ export default {
       weightCategory: '',
       phone: '',
       email: '',
-      role: 'coach',
+      role: 'participant',
       username: '',
       password: ''
     });

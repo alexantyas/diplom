@@ -27,6 +27,32 @@ const routes = [
     meta: { requiresAuth: true, roles: ['organizer'] }
   },
   {
+  path: '/profile-participant',
+  component: () => import('@/views/ParticipantProfile.vue'),
+  meta: { requiresAuth: true, roles: ['participant'] }
+},
+{
+  path: '/profile-coach',
+  component: () => import('@/views/CoachProfile.vue'),
+  meta: { requiresAuth: true, roles: ['coach'] }
+},
+{
+  path: '/my-team',
+  component: () => import('@/views/MyTeam.vue'),
+  meta: { requiresAuth: true, roles: ['coach'] }
+},
+{
+  path: '/events',
+  component: () => import('@/views/EventsPage.vue'),
+  meta: { requiresAuth: true, roles: ['coach', 'participant'] }
+},
+{
+  path: '/my-team/:id',
+  component: () => import('@/views/TeamMemberDetails.vue'),
+  meta: { requiresAuth: true, roles: ['coach'] }
+},
+
+  {
     path: '/dashboard',
     component: Dashboard,
     meta: { requiresAuth: true },
@@ -51,16 +77,27 @@ const router = createRouter({
 router.beforeEach((to, from, next) => {
   const isAuthenticated = store.getters.isAuthenticated;
   const userRole = store.getters.userRole;
-  const hasCompetition = store.getters.competition;
 
   if (to.meta.requiresAuth && !isAuthenticated) {
     next('/login');
   } else if (isAuthenticated && to.path === '/login') {
-    next('/create');
-  } else if (isAuthenticated && !hasCompetition && to.path !== '/create') {
-    next('/create');
+    // перенаправление в зависимости от роли
+    switch (userRole) {
+      case 'organizer':
+      case 'admin':
+        next('/create');
+        break;
+      case 'participant':
+        next('/profile-participant');
+        break;
+      case 'coach':
+        next('/profile-coach');
+        break;
+      default:
+        next('/login');
+    }
   } else if (to.meta.roles && !to.meta.roles.includes(userRole)) {
-    next('/dashboard');
+    next('/login');
   } else {
     next();
   }

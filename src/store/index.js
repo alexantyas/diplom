@@ -23,19 +23,22 @@ export default createStore({
       localStorage.setItem('user', JSON.stringify(user));
     },
     logout(state) {
-      // Очищаем все состояния
-      state.user = null;
-      state.competition = null;
-      state.teams = [];
-      state.participants = [];
-      state.schedule = [];
-      state.judges = [];
-      state.tournamentResults = [];
-      state.bracketState = null;
-      
-      // Очищаем localStorage
-      localStorage.clear(); // Очищаем весь localStorage, включая tournament_brackets
-    },
+  state.user = null;
+  state.competition = null;
+  state.teams = [];
+  state.participants = [];
+  state.schedule = [];
+  state.judges = [];
+  state.tournamentResults = [];
+  state.bracketState = null;
+
+  // Удаляем все ключи, кроме registeredUsers
+  Object.keys(localStorage).forEach(key => {
+    if (key !== 'registeredUsers') {
+      localStorage.removeItem(key);
+    }
+  });
+},
 
     // Управление соревнованием
     setCompetition(state, competition) {
