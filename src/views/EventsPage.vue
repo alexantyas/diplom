@@ -79,21 +79,29 @@ export default {
     };
 
     const applyToCompetition = (competitionId) => {
-      if (hasApplied(competitionId)) return;
+  if (hasApplied(competitionId)) return;
 
-      const newApp = {
-        id: Date.now(),
-        competitionId,
-        userId: user.value.username,
-        role: user.value.role,
-        status: 'pending',
-        date: new Date().toISOString()
-      };
+  const newApp = {
+  id: Date.now(),
+  competitionId,
+  userId: user.value.username,
+  role: user.value.role,
+  applicationType: user.value.role === 'coach' ? 'Командная' : 'Индивидуальная',
+  status: 'pending',
+  date: new Date().toISOString()
+};
 
-      applications.value.push(newApp);
-      localStorage.setItem('applications', JSON.stringify(applications.value));
-      alert('Заявка успешно подана');
-    };
+  if (user.value.role === 'coach') {
+    const allParticipants = JSON.parse(localStorage.getItem('participants')) || [];
+    const teamMembers = allParticipants.filter(p => p.team === user.value.organization);
+    newApp.team = user.value.organization;
+    newApp.members = teamMembers;
+  }
+
+  applications.value.push(newApp);
+  localStorage.setItem('applications', JSON.stringify(applications.value));
+  alert('Заявка успешно подана');
+};
 
     const logout = () => {
       store.commit('logout');

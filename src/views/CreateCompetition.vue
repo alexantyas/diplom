@@ -105,9 +105,14 @@ import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 import { ref, computed } from 'vue';
 import * as XLSX from 'xlsx';
-
+import { onMounted } from 'vue';
 export default {
   setup() {
+    const createdCompetitions = ref([]);
+
+    onMounted(() => {
+      createdCompetitions.value = JSON.parse(localStorage.getItem('competitions')) || [];
+    });
     const store = useStore();
     const router = useRouter();
     const importedData = ref(null);
@@ -215,14 +220,28 @@ export default {
     };
 
     const saveCompetition = () => {
-      if (!competition.value.name || !competition.value.city || !competition.value.startDate) {
-        alert('Пожалуйста, заполните все поля!');
-        return;
-      }
+  if (!competition.value.name || !competition.value.city || !competition.value.startDate) {
+    alert('Пожалуйста, заполните все поля!');
+    return;
+  }
 
-      store.commit('setCompetition', { ...competition.value });
-      router.push('/dashboard/teams');
-    };
+  const newCompetition = {
+    id: Date.now(),
+    name: competition.value.name,
+    city: competition.value.city,
+    country: competition.value.country,
+    startDate: competition.value.startDate,
+    type: competition.value.type,
+    status: 'Открыта'
+  };
+
+  const existing = JSON.parse(localStorage.getItem('competitions')) || [];
+  existing.push(newCompetition);
+  localStorage.setItem('competitions', JSON.stringify(existing));
+
+  alert('✅ Соревнование успешно создано!');
+};
+
 
     const logout = async () => {
       try {

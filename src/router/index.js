@@ -27,31 +27,36 @@ const routes = [
     meta: { requiresAuth: true, roles: ['organizer'] }
   },
   {
-  path: '/profile-participant',
-  component: () => import('@/views/ParticipantProfile.vue'),
-  meta: { requiresAuth: true, roles: ['participant'] }
-},
-{
-  path: '/profile-coach',
-  component: () => import('@/views/CoachProfile.vue'),
-  meta: { requiresAuth: true, roles: ['coach'] }
-},
-{
-  path: '/my-team',
-  component: () => import('@/views/MyTeam.vue'),
-  meta: { requiresAuth: true, roles: ['coach'] }
-},
-{
-  path: '/events',
-  component: () => import('@/views/EventsPage.vue'),
-  meta: { requiresAuth: true, roles: ['coach', 'participant'] }
-},
-{
-  path: '/my-team/:id',
-  component: () => import('@/views/TeamMemberDetails.vue'),
-  meta: { requiresAuth: true, roles: ['coach'] }
+    path: '/profile-participant',
+    component: () => import('@/views/ParticipantProfile.vue'),
+    meta: { requiresAuth: true, roles: ['participant'] }
+  },
+  {
+    path: '/profile-coach',
+    component: () => import('@/views/CoachProfile.vue'),
+    meta: { requiresAuth: true, roles: ['coach'] }
+  },
+  {
+    path: '/my-team',
+    component: () => import('@/views/MyTeam.vue'),
+    meta: { requiresAuth: true, roles: ['coach'] }
+  },
+  {
+    path: '/events',
+    component: () => import('@/views/EventsPage.vue'),
+    meta: { requiresAuth: true, roles: ['coach', 'participant'] }
+  },
+  {
+  path: '/dashboard/competition/:id',
+  component: () => import('@/views/CompetitionDashboard.vue'),
+  meta: { requiresAuth: true, roles: ['organizer'] }
 },
 
+  {
+    path: '/my-team/:id',
+    component: () => import('@/views/TeamMemberDetails.vue'),
+    meta: { requiresAuth: true, roles: ['coach'] }
+  },
   {
     path: '/dashboard',
     component: Dashboard,
@@ -63,11 +68,15 @@ const routes = [
       { path: 'judges', component: JudgesPage, meta: { requiresAuth: true } },
       { path: 'print', component: PrintPage, meta: { requiresAuth: true, roles: ['organizer', 'secretariat', 'admin'] } },
       { path: 'participants', component: ParticipantsPage, meta: { requiresAuth: true, roles: ['organizer'] } },
-      { path: 'bracket', component: BracketPage }
+      { path: 'bracket', component: BracketPage },
+      {
+        path: 'created',
+        component: () => import('@/views/CreatedCompetitions.vue'),
+        meta: { requiresAuth: true, roles: ['organizer'] }
+      }
     ]
   }
 ];
-
 
 const router = createRouter({
   history: createWebHistory(),
@@ -81,7 +90,6 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !isAuthenticated) {
     next('/login');
   } else if (isAuthenticated && to.path === '/login') {
-    // перенаправление в зависимости от роли
     switch (userRole) {
       case 'organizer':
       case 'admin':

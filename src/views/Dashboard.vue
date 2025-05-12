@@ -9,6 +9,9 @@
             <li class="nav-item">
               <router-link to="/create" class="nav-link">Создание</router-link>
             </li>
+            <li v-if="userRole === 'organizer'" class="nav-item">
+              <router-link to="/dashboard/created" class="nav-link">Созданные соревнования</router-link>
+            </li>
             <li class="nav-item">
               <router-link to="/dashboard/teams" class="nav-link">Команды</router-link>
             </li>
