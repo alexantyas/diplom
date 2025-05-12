@@ -13,13 +13,25 @@ import BracketPage from '@/views/BracketPage.vue';
 const routes = [
   { path: '/login', component: LoginPage },
   { path: '/', redirect: '/login' },
-  { path: '/create', component: CreateCompetition, meta: { requiresAuth: true, roles: ['organizer'] } },
-  { 
-    path: '/dashboard', 
+  {
+    path: '/register-participant',
+    component: () => import('@/views/RegisterParticipant.vue')
+  },
+  {
+    path: '/register-coach',
+    component: () => import('@/views/RegisterCoach.vue')
+  },
+  {
+    path: '/create',
+    component: CreateCompetition,
+    meta: { requiresAuth: true, roles: ['organizer'] }
+  },
+  {
+    path: '/dashboard',
     component: Dashboard,
     meta: { requiresAuth: true },
     children: [
-      { path: '', redirect: 'teams' }, // Редирект по умолчанию на команды
+      { path: '', redirect: 'teams' },
       { path: 'teams', component: TeamsPage, meta: { requiresAuth: true, roles: ['organizer'] } },
       { path: 'schedule', component: SchedulePage, meta: { requiresAuth: true } },
       { path: 'judges', component: JudgesPage, meta: { requiresAuth: true } },
@@ -29,6 +41,7 @@ const routes = [
     ]
   }
 ];
+
 
 const router = createRouter({
   history: createWebHistory(),

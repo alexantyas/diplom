@@ -17,7 +17,15 @@
           <button @click="login" class="btn btn-primary w-100">
             Войти
           </button>
-  
+          <p class="text-center mt-3">
+            Вы участник?
+           <router-link to="/register-participant">Зарегистрироваться</router-link>
+          </p>
+          <p class="text-center">
+             Вы тренер?
+          <router-link to="/register-coach">Зарегистрироваться</router-link>
+          </p>
+
           <div v-if="errorMessage" class="alert alert-danger mt-3">
             {{ errorMessage }}
           </div>
@@ -40,16 +48,25 @@
       const errorMessage = ref('');
   
       const login = () => {
-        const users = [
-          { username: 'admin', password: 'admin123', role: 'organizer' },
-          { username: 'judge', password: 'judge123', role: 'judge' }
-        ];
-  
+        const users = JSON.parse(localStorage.getItem('registeredUsers')) || [];
+
         const user = users.find(u => u.username === username.value && u.password === password.value);
-  
+
         if (user) {
           store.commit('setUser', user);
-          router.push('/create'); // Перенаправляем на страницу создания
+            // Роутинг по ролям
+        switch (user.role) {
+            case 'organizer':
+            case 'admin':
+            router.push('/create');
+            break;
+            case 'participant':
+            case 'coach':
+            router.push('/competitions'); // 🔜 нужно создать такую страницу
+            break;
+            default:
+            errorMessage.value = 'Неизвестная роль';
+          }
         } else {
           errorMessage.value = 'Неверный логин или пароль';
         }
