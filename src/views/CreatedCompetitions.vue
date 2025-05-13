@@ -84,7 +84,7 @@ export default {
     };
 
     const openCompetition = (id) => {
-      router.push(`/dashboard/competition/${id}`);
+      router.push(`/competition/${id}`);
     };
 
     return {

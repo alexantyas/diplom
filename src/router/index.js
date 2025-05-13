@@ -13,14 +13,8 @@ import BracketPage from '@/views/BracketPage.vue';
 const routes = [
   { path: '/login', component: LoginPage },
   { path: '/', redirect: '/login' },
-  {
-    path: '/register-participant',
-    component: () => import('@/views/RegisterParticipant.vue')
-  },
-  {
-    path: '/register-coach',
-    component: () => import('@/views/RegisterCoach.vue')
-  },
+  { path: '/register-participant', component: () => import('@/views/RegisterParticipant.vue') },
+  { path: '/register-coach', component: () => import('@/views/RegisterCoach.vue') },
   {
     path: '/create',
     component: CreateCompetition,
@@ -47,35 +41,42 @@ const routes = [
     meta: { requiresAuth: true, roles: ['coach', 'participant'] }
   },
   {
-  path: '/dashboard/competition/:id',
-  component: () => import('@/views/CompetitionDashboard.vue'),
-  meta: { requiresAuth: true, roles: ['organizer'] }
-},
-
-  {
     path: '/my-team/:id',
     component: () => import('@/views/TeamMemberDetails.vue'),
     meta: { requiresAuth: true, roles: ['coach'] }
   },
+  
+  
   {
-    path: '/dashboard',
-    component: Dashboard,
-    meta: { requiresAuth: true },
-    children: [
-      { path: '', redirect: 'teams' },
-      { path: 'teams', component: TeamsPage, meta: { requiresAuth: true, roles: ['organizer'] } },
-      { path: 'schedule', component: SchedulePage, meta: { requiresAuth: true } },
-      { path: 'judges', component: JudgesPage, meta: { requiresAuth: true } },
-      { path: 'print', component: PrintPage, meta: { requiresAuth: true, roles: ['organizer', 'secretariat', 'admin'] } },
-      { path: 'participants', component: ParticipantsPage, meta: { requiresAuth: true, roles: ['organizer'] } },
-      { path: 'bracket', component: BracketPage },
-      {
-        path: 'created',
-        component: () => import('@/views/CreatedCompetitions.vue'),
-        meta: { requiresAuth: true, roles: ['organizer'] }
-      }
-    ]
-  }
+  path: '/dashboard',
+  component: Dashboard,
+  meta: { requiresAuth: true },
+  children: [
+    { path: '', redirect: 'teams' },
+    { path: 'created', component: () => import('@/views/CreatedCompetitions.vue') }, // ✅ ДОБАВЬ ЭТО
+    { path: 'teams', component: TeamsPage, meta: { requiresAuth: true, roles: ['organizer'] } },
+    { path: 'schedule', component: SchedulePage },
+    { path: 'judges', component: JudgesPage },
+    { path: 'print', component: PrintPage, meta: { requiresAuth: true, roles: ['organizer', 'secretariat', 'admin'] } },
+    { path: 'participants', component: ParticipantsPage, meta: { requiresAuth: true, roles: ['organizer'] } },
+    { path: 'bracket', component: BracketPage }
+  ]
+},
+
+  {
+  path: '/competition/:id',
+  component: () => import('@/views/CompetitionDashboard.vue'),
+  meta: { requiresAuth: true, roles: ['organizer'] },
+  children: [
+    { path: '', component: () => import('@/views/CompetitionOverview.vue') },
+    { path: 'schedule', component: SchedulePage },
+    { path: 'bracket', component: BracketPage },
+    { path: 'judges', component: JudgesPage },
+    { path: 'participants', component: ParticipantsPage },
+    { path: 'print', component: PrintPage }
+  ]
+}
+
 ];
 
 const router = createRouter({

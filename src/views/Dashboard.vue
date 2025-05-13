@@ -1,40 +1,9 @@
 <template>
   <div>
     <!-- Навигация -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div class="container">
-        <a class="navbar-brand" href="#">ARENA</a>
-        <div class="collapse navbar-collapse">
-          <ul class="navbar-nav me-auto">
-            <li class="nav-item">
-              <router-link to="/create" class="nav-link">Создание</router-link>
-            </li>
-            <li v-if="userRole === 'organizer'" class="nav-item">
-              <router-link to="/dashboard/created" class="nav-link">Созданные соревнования</router-link>
-            </li>
-            <li class="nav-item">
-              <router-link to="/dashboard/teams" class="nav-link">Команды</router-link>
-            </li>
-            <li class="nav-item">
-              <router-link to="/dashboard/schedule" class="nav-link">Расписание</router-link>
-            </li>
-            <li class="nav-item">
-              <router-link to="/dashboard/bracket" class="nav-link">Сетка</router-link>
-            </li>
-            <li class="nav-item">
-              <router-link to="/dashboard/judges" class="nav-link">Судейская</router-link>
-            </li>
-            <li v-if="userRole === 'organizer'" class="nav-item">
-              <router-link to="/dashboard/participants" class="nav-link">Участники</router-link>
-            </li>
-            <li v-if="userRole === 'organizer'" class="nav-item">
-              <router-link to="/dashboard/print" class="nav-link">Печать</router-link>
-            </li>
-          </ul>
-          <button @click="logout" class="btn btn-danger">Выход</button>
-        </div>
-      </div>
-    </nav>
+    
+      
+    
 
     <!-- Основной контент -->
     <div class="container-fluid">
