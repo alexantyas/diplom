@@ -16,7 +16,7 @@
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h4 class="mb-0">Состав команды</h4>
     </div>
-    <div v-if="team.length === 0">У вас пока нет участников в команде.</div>
+    <div v-if="!Array.isArray(team) || team.length === 0">У вас пока нет участников в команде.</div>
     <table v-else class="table table-bordered">
       <thead>
         <tr>
@@ -27,7 +27,7 @@
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(member, index) in team" :key="member.id">
+        <tr v-for="member in team" :key="member.id">
           <td>{{ member.last_name }} {{ member.first_name }} {{ member.middle_name }}</td>
           <td>{{ member.weight }}</td>
           <td>{{ getCityName(member.city_id) }}</td>
@@ -48,50 +48,51 @@ export default {
   setup() {
     const store = useStore();
     const router = useRouter();
-    const token = localStorage.getItem('token');
 
-    const user = ref({});
     const team = ref([]);
-    const teamMembers = ref([]);
     const users = ref([]);
     const cities = ref([]);
     const countries = ref([]);
 
+    // Вся авторизация делается через interceptor (см. api.js!)
     const fetchTeam = async () => {
-      // 1. Получить данные тренера
-      const userResp = await api.get('/users/me', { headers: { Authorization: `Bearer ${token}` } });
-      user.value = userResp.data;
+      // 1. Получаем список участников своей команды
+      const teamMembersResp = await api.get('/teams/my-team');
+      const teamMembers = teamMembersResp.data;
 
-      // 2. Получить всех team_members, где team_id тренера
-      const teamMembersResp = await api.get('/teams/members/');
-      teamMembers.value = teamMembersResp.data.filter(tm => tm.team_id === user.value.organization);
-
-      // 3. Получить всех пользователей и инфу о городах/странах
+      // 2. Получаем всех пользователей
       const usersResp = await api.get('/users/');
       users.value = usersResp.data;
 
+      // 3. Город и страна
       const citiesResp = await api.get('/cities/');
       cities.value = citiesResp.data;
       const countriesResp = await api.get('/countries/');
       countries.value = countriesResp.data;
 
-      // 4. Собрать участников команды
-      team.value = teamMembers.value.map(tm => {
+      // 4. Собираем участников (users из своей команды)
+      team.value = teamMembers.map(tm => {
         const u = users.value.find(usr => usr.id === tm.user_id);
         return u || {};
-      }).filter(u => u.id); // Убираем пустые
+      }).filter(u => u.id); // убираем несуществующих
     };
 
-    const getCityName = (id) => {
+    const getCityName = id => {
       const city = cities.value.find(c => c.id === id);
       return city ? city.name : '';
     };
-    const getCountryName = (id) => {
+    const getCountryName = id => {
       const country = countries.value.find(c => c.id === id);
       return country ? country.name : '';
     };
 
-    onMounted(fetchTeam);
+    onMounted(async () => {
+      try {
+        await fetchTeam();
+      } catch (err) {
+        console.error('Ошибка при получении состава команды:', err);
+      }
+    });
 
     const logout = () => {
       store.commit('logout');
@@ -99,7 +100,6 @@ export default {
     };
 
     return {
-      user,
       team,
       getCityName,
       getCountryName,

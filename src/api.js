@@ -4,7 +4,18 @@ const api = axios.create({
   baseURL: 'http://127.0.0.1:8000',
 });
 
-// Авторизация (логин)
+// << ДОБАВЬ interceptor (он добавляет токен во все запросы кроме /auth/token)
+api.interceptors.request.use(config => {
+  // Не добавляем токен только для ручки /auth/token
+  if (!config.url.endsWith('/auth/token')) {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+  }
+  return config;
+});
+
 export async function loginUser(username, password) {
   return api.post(
     '/auth/token',
@@ -18,11 +29,9 @@ export async function loginUser(username, password) {
   );
 }
 
-// Получить профиль пользователя по токену
 export async function getProfile(token) {
-  return api.get('/users/me', {
-    headers: { Authorization: `Bearer ${token}` },
-  });
+  // Теперь этот метод не нужен – можно просто: await api.get('/users/me')
+  return api.get('/users/me');
 }
 
 export default api;

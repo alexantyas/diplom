@@ -1,5 +1,5 @@
 import { createStore } from 'vuex';
-import { api } from '../mocks/api';
+import api from '@/api';
 
 export default createStore({
   state: {
