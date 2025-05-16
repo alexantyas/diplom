@@ -2,25 +2,19 @@
   <div class="container d-flex justify-content-center align-items-center min-vh-100">
     <div class="col-md-4">
       <h2 class="text-center mb-4">Вход</h2>
-
       <div class="card p-4 shadow-sm">
         <div class="mb-3">
           <label class="form-label">Логин</label>
           <input v-model="username" type="text" class="form-control" placeholder="Введите логин">
         </div>
-
         <div class="mb-3">
           <label class="form-label">Пароль</label>
           <input v-model="password" type="password" class="form-control" placeholder="Введите пароль">
         </div>
-
         <button @click="login" class="btn btn-primary w-100">Войти</button>
-
         <div v-if="errorMessage" class="alert alert-danger mt-3">
           {{ errorMessage }}
         </div>
-
-        <!-- Ссылки на регистрацию -->
         <p class="text-center mt-3">
           Вы участник?
           <router-link to="/register-participant" class="btn btn-link">Зарегистрироваться</router-link>
@@ -35,71 +29,42 @@
 </template>
 
 <script>
-import { useStore } from 'vuex';
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+import { loginUser } from '@/api'; // импортируй loginUser
 
 export default {
   setup() {
-    const store = useStore();
     const router = useRouter();
     const username = ref('');
     const password = ref('');
     const errorMessage = ref('');
 
-    const login = () => {
-      // Получаем динамически зарегистрированных пользователей
-      const registered = JSON.parse(localStorage.getItem('registeredUsers')) || [];
+    const login = async () => {
+      errorMessage.value = '';
+      try {
+        // Запрос на получение токена
+        const response = await loginUser(username.value, password.value);
+        const { access_token } = response.data;
+        localStorage.setItem('token', access_token);
 
-      // Статически встроенные пользователи
-      const staticUsers = [
-        {
-          username: 'admin',
-          password: 'admin123',
-          role: 'organizer',
-          fullName: 'Администратор',
-          city: 'Москва',
-          country: 'Россия',
-          email: 'admin@arena.ru'
-        },
-        {
-          username: 'judge',
-          password: 'judge123',
-          role: 'judge',
-          fullName: 'Судья',
-          city: 'Сочи',
-          country: 'Россия',
-          email: 'judge@arena.ru'
+        // Получаем профиль пользователя (по защищённому роуту)
+        const userResponse = await fetch('http://127.0.0.1:8000/users/me', {
+          headers: { Authorization: `Bearer ${access_token}` }
+        });
+        const user = await userResponse.json();
+
+        // Редирект по роли (пример, подстрой под свои маршруты)
+        if (user.role_id === 1) {
+          router.push('/admin');
+        } else if (user.role_id === 2) {
+          router.push('/profile-coach');
+        } else if (user.role_id === 3) {
+          router.push('/profile-participant');
+        } else {
+          router.push('/');
         }
-      ];
-
-      // Объединяем всех
-      const users = [...staticUsers, ...registered];
-
-      // Поиск пользователя
-      const user = users.find(
-        u => u.username === username.value && u.password === password.value
-      );
-
-      if (user) {
-        store.commit('setUser', user);
-
-        // Перенаправление по роли
-        switch (user.role) {
-          case 'organizer':
-          case 'admin':
-            router.push('/create');
-            break;
-          case 'participant':
-            router.push('/profile-participant');
-            break;
-          case 'coach':
-            router.push('/profile-coach');
-            break;
-          default:
-            errorMessage.value = 'Неизвестная роль';
-        }
-      } else {
+      } catch (err) {
         errorMessage.value = 'Неверный логин или пароль';
       }
     };
