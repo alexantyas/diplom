@@ -31,11 +31,13 @@
 <script>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
-import { loginUser } from '@/api'; // импортируй loginUser
+import { useStore } from 'vuex';
+import { loginUser } from '@/api';
 
 export default {
   setup() {
     const router = useRouter();
+    const store = useStore(); // используем useStore
     const username = ref('');
     const password = ref('');
     const errorMessage = ref('');
@@ -43,20 +45,21 @@ export default {
     const login = async () => {
       errorMessage.value = '';
       try {
-        // Запрос на получение токена
+        // Получение токена
         const response = await loginUser(username.value, password.value);
         const { access_token } = response.data;
         localStorage.setItem('token', access_token);
 
-        // Получаем профиль пользователя (по защищённому роуту)
+        // Получение пользователя
         const userResponse = await fetch('http://127.0.0.1:8000/users/me', {
           headers: { Authorization: `Bearer ${access_token}` }
         });
         const user = await userResponse.json();
+        store.commit('setUser', user); // <<< ОБЯЗАТЕЛЬНО!
 
-        // Редирект по роли (пример, подстрой под свои маршруты)
+        // Редирект по роли
         if (user.role_id === 1) {
-          router.push('/admin');
+          router.push('/create');
         } else if (user.role_id === 2) {
           router.push('/profile-coach');
         } else if (user.role_id === 3) {
@@ -69,12 +72,8 @@ export default {
       }
     };
 
-    return {
-      username,
-      password,
-      errorMessage,
-      login
-    };
+    return { username, password, errorMessage, login };
   }
 };
 </script>
+

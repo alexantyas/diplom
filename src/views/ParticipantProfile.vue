@@ -1,34 +1,29 @@
 <template>
-    <!-- Навигационная панель -->
-<nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-  <div class="container-fluid">
-    <a class="navbar-brand" href="#">ARENA</a>
-    <div class="collapse navbar-collapse">
-      <ul class="navbar-nav me-auto">
-        <li class="nav-item">
-          <router-link to="/profile-participant" class="nav-link">Профиль</router-link>
-        </li>
-        <li class="nav-item">
-          <router-link to="/events" class="nav-link">Предстоящие соревнования</router-link>
-        </li>
-      </ul>
-      <button @click="logout" class="btn btn-danger">Выход</button>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="#">ARENA</a>
+      <div class="collapse navbar-collapse">
+        <ul class="navbar-nav me-auto">
+          <li class="nav-item">
+            <router-link to="/profile-participant" class="nav-link">Профиль</router-link>
+          </li>
+          <li class="nav-item">
+            <router-link to="/events" class="nav-link">Предстоящие соревнования</router-link>
+          </li>
+        </ul>
+        <button @click="logout" class="btn btn-danger">Выход</button>
+      </div>
     </div>
-  </div>
-</nav>
+  </nav>
   <div class="container mt-5">
-    <!-- Верх: профиль -->
     <div class="row mb-4">
       <div class="col-md-9">
         <div class="card p-4 h-100">
           <h4 class="mb-3">Профиль участника</h4>
-          <p><strong>ФИО:</strong> {{ user.fullName }}</p>
-          <p><strong>Адрес:</strong> {{ user.city }}, {{ user.country }}</p>
+          <p><strong>ФИО:</strong> {{ user.last_name }} {{ user.first_name }} {{ user.middle_name }}</p>
+          <p><strong>Адрес:</strong> {{ cityName }}, {{ countryName }}</p>
           <p><strong>Телефон:</strong> {{ user.phone }}</p>
-          <p><strong>Выигранных матчей:</strong> 0</p>
-          <p><strong>Поражений:</strong> 0</p>
-          <p><strong>Ник:</strong> {{ user.username }}</p>
-          <p><strong>Документы:</strong> —</p>
+          <p><strong>Ник:</strong> {{ user.login }}</p>
           <button class="btn btn-outline-success">Редактировать профиль</button>
         </div>
       </div>
@@ -45,36 +40,17 @@
       <h5 class="mb-3">Мои заявки</h5>
       <div v-if="myApplications.length === 0">Заявок пока нет.</div>
       <ul class="list-group" v-else>
-        <li class="list-group-item" v-for="app in myApplications" :key="app.id">
-          Соревнование: {{ getCompetitionName(app.competitionId) }} — <strong>{{ app.status }}</strong>
+        <li class="list-group-item" v-for="app in myApplications" :key="app.application.id">
+          Соревнование: {{ app.competition.name }} — <strong>{{ app.status }}</strong>
         </li>
       </ul>
-    </div>
-
-    <!-- Статистика -->
-    <div class="card p-4">
-      <h5 class="mb-3">Статистика</h5>
-      <table class="table table-bordered">
-        <thead>
-          <tr>
-            <th>Соревнование</th>
-            <th>Схватка</th>
-            <th>Результат</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr>
-            <td colspan="3" class="text-center">Нет данных</td>
-          </tr>
-        </tbody>
-      </table>
     </div>
   </div>
 </template>
 
-
 <script>
-import { ref, onMounted } from 'vue';
+import api from '@/api'; // путь до твоего api.js (axios instance)
+import { ref, onMounted, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
 
@@ -83,22 +59,47 @@ export default {
     const store = useStore();
     const router = useRouter();
 
-    const user = ref(JSON.parse(localStorage.getItem('user')) || {});
-    const applications = ref([]);
-    const competitions = ref([]);
-
-    onMounted(() => {
-      applications.value = JSON.parse(localStorage.getItem('applications')) || [];
-      competitions.value = JSON.parse(localStorage.getItem('competitions')) || [];
-      myApplications.value = applications.value.filter(app => app.userId === user.value.username);
-    });
-
+    const token = localStorage.getItem('token');
+    const user = ref({});
     const myApplications = ref([]);
+    const competitions = ref([]);
+    const applications = ref([]);
+    const applicationParticipants = ref([]);
+    const cities = ref([]);
+    const countries = ref([]);
 
-    const getCompetitionName = (id) => {
-      const comp = competitions.value.find(c => c.id === id);
-      return comp ? comp.name : 'Неизвестно';
+    
+    const cityName = computed(() => user.value.city_id || '');
+    const countryName = computed(() => user.value.country_id || '');
+
+    const fetchProfileData = async () => {
+  // 1. Получить профиль пользователя
+  const userResp = await api.get('/users/me', { headers: { Authorization: `Bearer ${token}` } });
+  user.value = userResp.data;
+
+  // 2. Получить все application_participants для этого user_id
+  const apResp = await api.get('/applications/participants/');
+  const myAppParts = apResp.data.filter(ap => ap.user_id === user.value.id);
+
+  // 3. Получить все заявки и все соревнования
+  const appsResp = await api.get('/applications/');
+  applications.value = appsResp.data;
+  const compsResp = await api.get('/competitions/');
+  competitions.value = compsResp.data;
+
+  // 4. Собрать мои заявки с названиями соревнований
+  myApplications.value = myAppParts.map(ap => {
+    const app = applications.value.find(a => a.id === ap.application_id);
+    const comp = app ? competitions.value.find(c => c.id === app.competition_id) : null;
+    return {
+      application: app,
+      competition: comp,
+      status: ap.status
     };
+  });
+};
+
+    onMounted(fetchProfileData);
 
     const logout = () => {
       store.commit('logout');
@@ -108,10 +109,10 @@ export default {
     return {
       user,
       myApplications,
-      getCompetitionName,
-      logout
+      cityName,
+      countryName,
+      logout,
     };
   }
 };
 </script>
-

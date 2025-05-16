@@ -258,7 +258,14 @@ export default createStore({
 
   getters: {
     isAuthenticated: state => !!state.user,
-    userRole: state => state.user ? state.user.role : null,
+    userRole: state => {
+  if (!state.user) return null;
+  if (state.user.role_id === 1) return 'organizer';
+  if (state.user.role_id === 2) return 'coach';
+  if (state.user.role_id === 3) return 'participant';
+  
+  return null;
+},
     competition: state => state.competition,
     teams: state => state.teams,
     participants: state => state.participants,
