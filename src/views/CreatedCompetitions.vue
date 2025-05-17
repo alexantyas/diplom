@@ -61,6 +61,8 @@ export default {
 
     onMounted(async () => {
       const token = localStorage.getItem("access_token");
+
+      // Загружаем соревнования
       try {
         const res = await fetch("http://localhost:8000/competitions/", {
           headers: { Authorization: `Bearer ${token}` }
@@ -71,12 +73,20 @@ export default {
         console.error("Ошибка при загрузке соревнований:", e);
       }
 
-      // позже: замени на fetch реальных заявок
-      applications.value = JSON.parse(localStorage.getItem("applications")) || [];
+      // Загружаем заявки
+      try {
+        const res = await fetch("http://localhost:8000/applications/", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        applications.value = await res.json();
+      } catch (e) {
+        console.error("Ошибка при загрузке заявок:", e);
+      }
     });
 
+    // Подсчёт количества заявок на соревнование
     const getApplicationCount = (competitionId) => {
-      return applications.value.filter(app => app.competitionId === competitionId).length;
+      return applications.value.filter(app => app.competition_id === competitionId).length;
     };
 
     const updateStatus = async (updatedComp) => {
@@ -96,27 +106,27 @@ export default {
     };
 
     const deleteCompetition = async (idToDelete) => {
-  if (!confirm('Вы уверены, что хотите удалить это соревнование?')) return;
+      if (!confirm('Вы уверены, что хотите удалить это соревнование?')) return;
 
-  const token = localStorage.getItem("access_token");
+      const token = localStorage.getItem("access_token");
 
-  try {
-    const res = await fetch(`http://localhost:8000/competitions/${idToDelete}`, {
-      method: "DELETE",
-      headers: {
-        Authorization: `Bearer ${token}`
+      try {
+        const res = await fetch(`http://localhost:8000/competitions/${idToDelete}`, {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+
+        if (!res.ok) throw new Error("Ошибка при удалении");
+
+        // Убираем с фронта
+        competitions.value = competitions.value.filter(c => c.id !== idToDelete);
+      } catch (e) {
+        console.error(e);
+        alert("❌ Не удалось удалить соревнование");
       }
-    });
-
-    if (!res.ok) throw new Error("Ошибка при удалении");
-
-    // Убираем с фронта
-    competitions.value = competitions.value.filter(c => c.id !== idToDelete);
-  } catch (e) {
-    console.error(e);
-    alert("❌ Не удалось удалить соревнование");
-  }
-};
+    };
 
     const openCompetition = (id) => {
       router.push(`/competition/${id}`);

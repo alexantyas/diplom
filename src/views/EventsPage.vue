@@ -68,8 +68,8 @@ export default {
 
     const token = localStorage.getItem("access_token");
 
-    const isCoach = user.value.role_id === 2;
-const isParticipant = user.value.role_id === 3;
+    const isCoach = computed(() => user.value.role_id === 2);
+const isAthlete = computed(() => user.value.role_id === 3);
 
     onMounted(async () => {
       try {
@@ -106,54 +106,82 @@ const isParticipant = user.value.role_id === 3;
       });
     };
 
-    const applyToCompetition = async (competitionId) => {
-      if (hasApplied(competitionId)) return;
+const applyToCompetition = async (competitionId) => {
+  if (hasApplied(competitionId)) return;
 
-      let memberIds = [];
+  let memberIds = [];
 
-      if (isCoach) {
-  const res = await fetch("http://localhost:8000/teams/my-team", {
-    headers: { Authorization: `Bearer ${token}` },
-  });
-  const teamMembers = await res.json();
-  memberIds = teamMembers.map(m => m.user_id);
-} else if (isAthlete) {
-  memberIds = [user.value.id];
-} else {
-        alert("Ваша роль не позволяет подать заявку");
-        return;
+  // Определяем роли
+  const isCoach = user.value.role_id === 2;
+  const isAthlete = user.value.role_id === 3;
+
+  if (isCoach) {
+    const res = await fetch("http://localhost:8000/teams/my-team", {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const teamMembers = await res.json();
+    memberIds = teamMembers.map(m => m.user_id);
+  } else if (isAthlete) {
+    memberIds = [user.value.id];
+  } else {
+    alert("Ваша роль не позволяет подать заявку");
+    return;
+  }
+
+  // Формируем тело заявки
+  const payload = {
+    competition_id: competitionId,
+    request_type_id: isCoach ? 2 : 1,
+    ...(isCoach ? { team_id: user.value.team_id } : {}), // включаем team_id только если тренер
+    request_date: new Date().toISOString().replace('Z', '')
+  };
+
+  try {
+    // Создаём заявку
+    const res = await fetch("http://localhost:8000/applications/", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(err);
+    }
+
+    const createdApplication = await res.json();
+
+    // Добавляем участников в заявку
+    for (const user_id of memberIds) {
+      const partRes = await fetch("http://localhost:8000/applications/participants/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          application_id: createdApplication.id,
+          user_id: user_id
+        })
+      });
+
+      if (!partRes.ok) {
+        const err = await partRes.text();
+        throw new Error(`Ошибка при добавлении участника: ${err}`);
       }
+    }
 
-      const payload = {
-        competition_id: competitionId,
-        request_type_id: isCoach ? 2 : 1,
-        team_id: isCoach ? user.value.team_id || null : null,
-        request_date: new Date().toISOString(),
-        member_ids: memberIds
-      };
+    alert("✅ Заявка и участники успешно поданы");
+    location.reload();
+  } catch (error) {
+    console.error("❌ Ошибка при подаче заявки:", error);
+    alert("❌ Не удалось подать заявку");
+  }
+};
 
-      try {
-        const res = await fetch("http://localhost:8000/applications/", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`
-          },
-          body: JSON.stringify(payload)
-        });
-
-        if (!res.ok) {
-          const err = await res.text();
-          throw new Error(err);
-        }
-
-        alert("✅ Заявка успешно подана");
-        location.reload();
-      } catch (error) {
-        console.error("❌ Ошибка при подаче заявки:", error);
-        alert("❌ Не удалось подать заявку");
-      }
-    };
 
     const formatDate = (str) => {
       return new Date(str).toLocaleDateString("ru-RU");
