@@ -25,7 +25,6 @@
         <div class="col-md-4 mb-3" v-for="app in applications" :key="app.id">
           <div class="card p-3 shadow-sm" style="cursor: pointer" @click="handleCardClick(app)">
             <p><strong>Пользователь:</strong> {{ app.userId }}</p>
-            <p><strong>Роль:</strong> {{ app.role }}</p>
             <p><strong>Тип заявки:</strong> {{ app.applicationType }}</p>
             <p><strong>Статус:</strong> {{ app.status }}</p>
           </div>

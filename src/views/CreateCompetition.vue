@@ -1,7 +1,6 @@
 <template>
   <div>
     <!-- Навигационная шапка -->
-   
 
     <!-- Основной контент -->
     <div class="container mt-4">
@@ -16,17 +15,13 @@
             </div>
 
             <div class="mb-3">
-              <label class="form-label">Город</label>
-              <input v-model="competition.city" type="text" class="form-control" placeholder="Введите город">
-            </div>
-
-            <div class="mb-3">
-              <label class="form-label">Страна</label>
-              <select v-model="competition.country" class="form-select">
-                <option>Швейцария</option>
-                <option>Россия</option>
-                <option>США</option>
-              </select>
+              <label class="form-label">Место проведения</label>
+              <select v-model="competition.venue_id" class="form-select">
+  <option disabled value="">Выберите место проведения</option>
+  <option v-for="venue in venues" :key="venue.id" :value="venue.id">
+    {{ venue.name }} — {{ venue.city_name }}
+  </option>
+</select>
             </div>
 
             <div class="mb-3">
@@ -73,9 +68,9 @@
 <script>
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import * as XLSX from 'xlsx';
-import { onMounted } from 'vue';
+
 export default {
   setup() {
     const createdCompetitions = ref([]);
@@ -86,11 +81,25 @@ export default {
     const store = useStore();
     const router = useRouter();
     const importedData = ref(null);
+    const venues = ref([]);
+
+    onMounted(async () => {
+      const token = localStorage.getItem("access_token");
+      try {
+        const response = await fetch("http://localhost:8000/competitions/venues/", {
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        });
+        venues.value = await response.json();
+      } catch (error) {
+        console.error("Ошибка при загрузке мест проведения:", error);
+      }
+    });
 
     const competition = ref({
       name: '',
-      city: '',
-      country: 'Россия',
+      venue_id: '',
       startDate: '',
       type: 'Чемпионат континента'
     });
@@ -120,7 +129,7 @@ export default {
           let teamsSet = new Set();
 
           dataRows.forEach(row => {
-            if (row.length === 0 || row.every(cell => !cell)) return; // Пропускаем пустые строки
+            if (row.length === 0 || row.every(cell => !cell)) return;
 
             let participant = {};
             headers.forEach((header, index) => {
@@ -134,12 +143,11 @@ export default {
               if (header.includes("страна")) participant.country = row[index]?.trim() || "";
             });
 
-            if (participant.name && participant.team) { // Проверяем наличие основных данных
+            if (participant.name && participant.team) {
               participants.push(participant);
             }
           });
 
-          // Устанавливаем данные для предпросмотра
           importedData.value = {
             teams: Array.from(teamsSet).map(name => ({ name })),
             participants,
@@ -189,45 +197,55 @@ export default {
       XLSX.writeFile(wb, "Шаблон_Соревнования.xlsx");
     };
 
-    const saveCompetition = () => {
-  if (!competition.value.name || !competition.value.city || !competition.value.startDate) {
-    alert('Пожалуйста, заполните все поля!');
-    return;
-  }
+    const saveCompetition = async () => {
+      if (!competition.value.name || !competition.value.startDate || !competition.value.venue_id) {
+        alert('Пожалуйста, заполните все поля!');
+        return;
+      }
 
-  const newCompetition = {
-    id: Date.now(),
-    name: competition.value.name,
-    city: competition.value.city,
-    country: competition.value.country,
-    startDate: competition.value.startDate,
-    type: competition.value.type,
-    status: 'Открыта'
-  };
+      const token = localStorage.getItem('access_token');
+      const payload = {
+        name: competition.value.name,
+        organizer: JSON.parse(localStorage.getItem("user"))?.full_name || 'admin',
+        start_date: competition.value.startDate,
+        status: 'Открыта',
+        comment: '',
+        venue_id: competition.value.venue_id
+      };
 
-  const existing = JSON.parse(localStorage.getItem('competitions')) || [];
-  existing.push(newCompetition);
-  localStorage.setItem('competitions', JSON.stringify(existing));
+      try {
+        const response = await fetch('http://localhost:8000/competitions/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
 
-  alert('✅ Соревнование успешно создано!');
-};
+        if (!response.ok) throw new Error('Ошибка при создании соревнования');
 
+        alert('✅ Соревнование успешно создано!');
+      } catch (error) {
+        console.error(error);
+        alert('❌ Не удалось создать соревнование');
+      }
+    };
 
     const logout = async () => {
       try {
         store.commit("logout");
-        // Небольшая задержка для завершения очистки данных
         await new Promise(resolve => setTimeout(resolve, 100));
         router.push('/login');
       } catch (error) {
         console.error('Ошибка при выходе:', error);
-        // Принудительное перенаправление в случае ошибки
         window.location.href = '/login';
       }
     };
 
     return {
       competition,
+      venues,
       importedData,
       saveCompetition,
       confirmImport,

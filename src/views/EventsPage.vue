@@ -24,7 +24,8 @@
     <!-- Список соревнований -->
     <div class="container mt-4">
       <h4 class="mb-4">Предстоящие соревнования</h4>
-      <div v-if="openCompetitions.length === 0">Соревнований с открытой регистрацией нет.</div>
+      <div v-if="competitions.length === 0">Загрузка...</div>
+      <div v-else-if="openCompetitions.length === 0">Соревнований с открытой регистрацией нет.</div>
 
       <div
         v-for="competition in openCompetitions"
@@ -34,8 +35,8 @@
         <div class="d-flex justify-content-between align-items-center">
           <div>
             <h5 class="mb-1">{{ competition.name }}</h5>
-            <p class="mb-1"><strong>Дата:</strong> {{ competition.date }}</p>
-            <p class="mb-0"><strong>Статус:</strong> {{ competition.status }}</p>
+            <p class="mb-1"><strong>Дата:</strong> {{ formatDate(competition.start_date) }}</p>
+            <p class="mb-0"><strong>Место:</strong> {{ competition.venue?.name }} ({{ competition.venue?.city?.name || '' }})</p>
           </div>
           <button
             class="btn btn-success"
@@ -59,13 +60,39 @@ export default {
   setup() {
     const router = useRouter();
     const store = useStore();
+
     const user = ref(JSON.parse(localStorage.getItem('user')) || {});
     const competitions = ref([]);
     const applications = ref([]);
+    const myAppParts = ref([]);
 
-    onMounted(() => {
-      competitions.value = JSON.parse(localStorage.getItem('competitions')) || [];
-      applications.value = JSON.parse(localStorage.getItem('applications')) || [];
+    const token = localStorage.getItem("access_token");
+
+    const isCoach = user.value.role_id === 2;
+const isParticipant = user.value.role_id === 3;
+
+    onMounted(async () => {
+      try {
+        const [compRes, appRes, partRes] = await Promise.all([
+          fetch("http://localhost:8000/competitions/", {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          fetch("http://localhost:8000/applications/", {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+          fetch("http://localhost:8000/applications/participants/", {
+            headers: { Authorization: `Bearer ${token}` }
+          }),
+        ]);
+
+        competitions.value = await compRes.json();
+        applications.value = await appRes.json();
+
+        const allParticipants = await partRes.json();
+        myAppParts.value = allParticipants.filter(p => p.user_id === user.value.id);
+      } catch (error) {
+        console.error("Ошибка при загрузке данных:", error);
+      }
     });
 
     const openCompetitions = computed(() =>
@@ -73,35 +100,64 @@ export default {
     );
 
     const hasApplied = (competitionId) => {
-      return applications.value.some(app =>
-        app.userId === user.value.username && app.competitionId === competitionId
-      );
+      return myAppParts.value.some(p => {
+        const app = applications.value.find(a => a.id === p.application_id);
+        return app?.competition_id === competitionId;
+      });
     };
 
-    const applyToCompetition = (competitionId) => {
-  if (hasApplied(competitionId)) return;
+    const applyToCompetition = async (competitionId) => {
+      if (hasApplied(competitionId)) return;
 
-  const newApp = {
-  id: Date.now(),
-  competitionId,
-  userId: user.value.username,
-  role: user.value.role,
-  applicationType: user.value.role === 'coach' ? 'Командная' : 'Индивидуальная',
-  status: 'pending',
-  date: new Date().toISOString()
-};
+      let memberIds = [];
 
-  if (user.value.role === 'coach') {
-    const allParticipants = JSON.parse(localStorage.getItem('participants')) || [];
-    const teamMembers = allParticipants.filter(p => p.team === user.value.organization);
-    newApp.team = user.value.organization;
-    newApp.members = teamMembers;
-  }
+      if (isCoach) {
+  const res = await fetch("http://localhost:8000/teams/my-team", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const teamMembers = await res.json();
+  memberIds = teamMembers.map(m => m.user_id);
+} else if (isAthlete) {
+  memberIds = [user.value.id];
+} else {
+        alert("Ваша роль не позволяет подать заявку");
+        return;
+      }
 
-  applications.value.push(newApp);
-  localStorage.setItem('applications', JSON.stringify(applications.value));
-  alert('Заявка успешно подана');
-};
+      const payload = {
+        competition_id: competitionId,
+        request_type_id: isCoach ? 2 : 1,
+        team_id: isCoach ? user.value.team_id || null : null,
+        request_date: new Date().toISOString(),
+        member_ids: memberIds
+      };
+
+      try {
+        const res = await fetch("http://localhost:8000/applications/", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const err = await res.text();
+          throw new Error(err);
+        }
+
+        alert("✅ Заявка успешно подана");
+        location.reload();
+      } catch (error) {
+        console.error("❌ Ошибка при подаче заявки:", error);
+        alert("❌ Не удалось подать заявку");
+      }
+    };
+
+    const formatDate = (str) => {
+      return new Date(str).toLocaleDateString("ru-RU");
+    };
 
     const logout = () => {
       store.commit('logout');
@@ -110,10 +166,12 @@ export default {
 
     return {
       user,
+      competitions,
       openCompetitions,
       hasApplied,
       applyToCompetition,
-      logout
+      logout,
+      formatDate
     };
   }
 };
