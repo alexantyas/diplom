@@ -55,6 +55,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
+import api from '@/api';
 
 export default {
   setup() {
@@ -64,23 +65,23 @@ export default {
     const user = ref(JSON.parse(localStorage.getItem('user')) || {});
     const competitions = ref([]);
     const applications = ref([]);
-    const myAppParts = ref([]);
+    const myAppParts = ref([]); // только индивидуальные участники
 
     const token = localStorage.getItem("access_token");
 
     const isCoach = computed(() => user.value.role_id === 2);
-const isAthlete = computed(() => user.value.role_id === 3);
+    const isAthlete = computed(() => user.value.role_id === 3);
 
     onMounted(async () => {
       try {
-        const [compRes, appRes, partRes] = await Promise.all([
+        const [compRes, appRes, individualRes] = await Promise.all([
           fetch("http://localhost:8000/competitions/", {
             headers: { Authorization: `Bearer ${token}` }
           }),
           fetch("http://localhost:8000/applications/", {
             headers: { Authorization: `Bearer ${token}` }
           }),
-          fetch("http://localhost:8000/applications/participants/", {
+          fetch("http://localhost:8000/applications/participants/individual/", {
             headers: { Authorization: `Bearer ${token}` }
           }),
         ]);
@@ -88,8 +89,8 @@ const isAthlete = computed(() => user.value.role_id === 3);
         competitions.value = await compRes.json();
         applications.value = await appRes.json();
 
-        const allParticipants = await partRes.json();
-        myAppParts.value = allParticipants.filter(p => p.user_id === user.value.id);
+        const allIndividual = await individualRes.json();
+        myAppParts.value = allIndividual.filter(p => p.user_id === user.value.id);
       } catch (error) {
         console.error("Ошибка при загрузке данных:", error);
       }
@@ -100,88 +101,97 @@ const isAthlete = computed(() => user.value.role_id === 3);
     );
 
     const hasApplied = (competitionId) => {
-      return myAppParts.value.some(p => {
-        const app = applications.value.find(a => a.id === p.application_id);
-        return app?.competition_id === competitionId;
-      });
-    };
-
-const applyToCompetition = async (competitionId) => {
-  if (hasApplied(competitionId)) return;
-
-  let memberIds = [];
-
-  // Определяем роли
-  const isCoach = user.value.role_id === 2;
-  const isAthlete = user.value.role_id === 3;
-
-  if (isCoach) {
-    const res = await fetch("http://localhost:8000/teams/my-team", {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const teamMembers = await res.json();
-    memberIds = teamMembers.map(m => m.user_id);
-  } else if (isAthlete) {
-    memberIds = [user.value.id];
-  } else {
-    alert("Ваша роль не позволяет подать заявку");
-    return;
-  }
-
-  // Формируем тело заявки
-  const payload = {
-    competition_id: competitionId,
-    request_type_id: isCoach ? 2 : 1,
-    ...(isCoach ? { team_id: user.value.team_id } : {}), // включаем team_id только если тренер
-    request_date: new Date().toISOString().replace('Z', '')
-  };
-
-  try {
-    // Создаём заявку
-    const res = await fetch("http://localhost:8000/applications/", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`
-      },
-      body: JSON.stringify(payload)
-    });
-
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(err);
-    }
-
-    const createdApplication = await res.json();
-
-    // Добавляем участников в заявку
-    for (const user_id of memberIds) {
-      const partRes = await fetch("http://localhost:8000/applications/participants/", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          application_id: createdApplication.id,
-          user_id: user_id
-        })
-      });
-
-      if (!partRes.ok) {
-        const err = await partRes.text();
-        throw new Error(`Ошибка при добавлении участника: ${err}`);
-      }
-    }
-
-    alert("✅ Заявка и участники успешно поданы");
-    location.reload();
-  } catch (error) {
-    console.error("❌ Ошибка при подаче заявки:", error);
-    alert("❌ Не удалось подать заявку");
-  }
+  return myAppParts.value.some(p => {
+    const app = applications.value.find(a => a.id === p.application_id);
+    return app?.competition_id === competitionId;
+  });
 };
 
+    const applyToCompetition = async (competitionId) => {
+      if (hasApplied(competitionId)) return;
+
+      try {
+        if (isCoach.value) {
+          // Подача командной заявки
+          const res = await api.get("/teams/my-team");
+          const teamMembers = res.data;
+
+          if (!Array.isArray(teamMembers) || teamMembers.length === 0) {
+            alert("❌ У вашей команды нет участников");
+            return;
+          }
+
+          const teamPayload = teamMembers.map(m => ({
+            first_name: m.first_name,
+            last_name: m.last_name,
+            middle_name: m.middle_name,
+            weight: m.weight,
+            birth_date: m.birth_date,
+            country_id: m.country_id,
+            city_id: m.city_id,
+            status: "Подано"
+          }));
+
+          const payload = {
+            competition_id: competitionId,
+            request_type_id: 2, // командная
+            team_id: user.value.team_id,
+            request_date: new Date().toISOString().replace('Z', ''),
+            team_participants: teamPayload
+          };
+
+          const appRes = await fetch("http://localhost:8000/applications/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!appRes.ok) {
+            const err = await appRes.text();
+            throw new Error(err);
+          }
+
+        } else if (isAthlete.value) {
+          // Подача индивидуальной заявки
+          const payload = {
+            competition_id: competitionId,
+            request_type_id: 1, // индивидуальная
+            request_date: new Date().toISOString().replace('Z', ''),
+            individual_participants: [{
+              user_id: user.value.id,
+              status: "Подано"
+            }]
+          };
+
+          const appRes = await fetch("http://localhost:8000/applications/", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!appRes.ok) {
+            const err = await appRes.text();
+            throw new Error(err);
+          }
+        } else {
+          alert("Ваша роль не позволяет подать заявку");
+          return;
+        }
+
+        alert("✅ Заявка успешно подана");
+        location.reload();
+
+      } catch (error) {
+        console.error("❌ Ошибка при подаче заявки:", error);
+        alert("❌ Не удалось подать заявку");
+      }
+    };
 
     const formatDate = (str) => {
       return new Date(str).toLocaleDateString("ru-RU");
@@ -204,3 +214,4 @@ const applyToCompetition = async (competitionId) => {
   }
 };
 </script>
+

@@ -15,41 +15,50 @@
       </div>
     </nav>
 
-    <!-- Подробности -->
+    <!-- Подробности участника -->
     <div class="container mt-4">
       <h4 class="mb-4">Подробности участника</h4>
 
       <div class="row mb-4">
-        <!-- Информация -->
         <div class="col-md-9">
-          <div class="card p-4">
+          <div class="card p-4" v-if="participant">
             <template v-if="!editing">
-              <p><strong>ФИО:</strong> {{ participant.name }}</p>
-              <p><strong>Вес:</strong> {{ participant.weight }}</p>
-              <p><strong>Город:</strong> {{ participant.city }}</p>
-              <p><strong>Страна:</strong> {{ participant.country }}</p>
-              <p><strong>Телефон:</strong> —</p>
-              <p><strong>Почта:</strong> —</p>
-              <p><strong>Документы:</strong> —</p>
+              <p><strong>ФИО:</strong> {{ fullName }}</p>
+              <p><strong>Вес:</strong> {{ participant.weight }} кг</p>
+              <p><strong>Дата рождения:</strong> {{ formatDate(participant.birth_date) }}</p>
+              <p><strong>Город:</strong> {{ getCityName(participant.city_id) }}</p>
+              <p><strong>Страна:</strong> {{ getCountryName(participant.country_id) }}</p>
               <button class="btn btn-outline-success mt-2" @click="editing = true">Редактировать профиль</button>
             </template>
 
             <template v-else>
               <div class="form-group mb-2">
-                <label>ФИО</label>
-                <input v-model="form.name" class="form-control" />
+                <label>Фамилия</label>
+                <input v-model="form.last_name" class="form-control" />
+              </div>
+              <div class="form-group mb-2">
+                <label>Имя</label>
+                <input v-model="form.first_name" class="form-control" />
+              </div>
+              <div class="form-group mb-2">
+                <label>Отчество</label>
+                <input v-model="form.middle_name" class="form-control" />
               </div>
               <div class="form-group mb-2">
                 <label>Вес</label>
-                <input v-model="form.weight" type="number" class="form-control" />
+                <input v-model.number="form.weight" type="number" class="form-control" />
               </div>
               <div class="form-group mb-2">
-                <label>Город</label>
-                <input v-model="form.city" class="form-control" />
+                <label>Дата рождения</label>
+                <input v-model="form.birth_date" type="date" class="form-control" />
               </div>
               <div class="form-group mb-2">
-                <label>Страна</label>
-                <input v-model="form.country" class="form-control" />
+                <label>Город (ID)</label>
+                <input v-model.number="form.city_id" class="form-control" />
+              </div>
+              <div class="form-group mb-2">
+                <label>Страна (ID)</label>
+                <input v-model.number="form.country_id" class="form-control" />
               </div>
               <div class="d-flex justify-content-end gap-2 mt-3">
                 <button class="btn btn-success" @click="saveChanges">Сохранить</button>
@@ -59,7 +68,7 @@
           </div>
         </div>
 
-        <!-- Фото -->
+        <!-- Фото (пока заглушка) -->
         <div class="col-md-3 d-flex align-items-center">
           <div class="card p-3 text-center w-100">
             <div class="mb-2 fw-bold">Фото</div>
@@ -68,7 +77,7 @@
         </div>
       </div>
 
-      <!-- Статистика -->
+      <!-- Заглушка под статистику -->
       <div class="card p-4">
         <h5 class="mb-3">Статистика</h5>
         <table class="table table-bordered">
@@ -80,9 +89,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td colspan="3">Нет данных</td>
-            </tr>
+            <tr><td colspan="3">Нет данных</td></tr>
           </tbody>
         </table>
       </div>
@@ -91,9 +98,10 @@
 </template>
 
 <script>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
+import api from '@/api';
 
 export default {
   setup() {
@@ -101,28 +109,44 @@ export default {
     const router = useRouter();
     const store = useStore();
 
-    const participant = ref({});
-    const editing = ref(false);
-    const form = ref({});
     const id = Number(route.params.id);
+    const participant = ref(null);
+    const form = ref({});
+    const editing = ref(false);
+    const cities = ref([]);
+    const countries = ref([]);
 
-    onMounted(() => {
-      const participants = JSON.parse(localStorage.getItem('participants')) || [];
-      if (participants[id]) {
-        participant.value = participants[id];
-        form.value = { ...participants[id] };
-      } else {
-        router.push('/my-team');
+    const fetchParticipant = async () => {
+      try {
+        const [teamRes, citiesRes, countriesRes] = await Promise.all([
+          api.get('/teams/my-team'),
+          api.get('/cities/'),
+          api.get('/countries/')
+        ]);
+        cities.value = citiesRes.data;
+        countries.value = countriesRes.data;
+
+        const match = teamRes.data.find(p => p.id === id);
+        if (!match) return router.push('/my-team');
+
+        participant.value = match;
+        form.value = { ...match };
+      } catch (err) {
+        console.error('❌ Ошибка при получении участника:', err);
+        router.push('/login');
       }
-    });
+    };
 
-    const saveChanges = () => {
-      const participants = JSON.parse(localStorage.getItem('participants')) || [];
-      participants[id] = { ...form.value };
-      localStorage.setItem('participants', JSON.stringify(participants));
-      participant.value = { ...form.value };
-      editing.value = false;
-      alert('Изменения сохранены');
+    const saveChanges = async () => {
+      try {
+        await api.put(`/teams/members/${id}`, form.value);
+        participant.value = { ...form.value };
+        editing.value = false;
+        alert('✅ Изменения сохранены');
+      } catch (err) {
+        console.error('❌ Ошибка при сохранении:', err);
+        alert('Не удалось сохранить изменения');
+      }
     };
 
     const cancelEdit = () => {
@@ -130,10 +154,22 @@ export default {
       editing.value = false;
     };
 
+    const getCityName = id => cities.value.find(c => c.id === id)?.name || '—';
+    const getCountryName = id => countries.value.find(c => c.id === id)?.name || '—';
+    const formatDate = date => date ? new Date(date).toLocaleDateString('ru-RU') : '—';
+
     const logout = () => {
       store.commit('logout');
       router.push('/login');
     };
+
+    const fullName = computed(() => {
+      if (!participant.value) return '';
+      const { last_name, first_name, middle_name } = participant.value;
+      return [last_name, first_name, middle_name].filter(Boolean).join(' ');
+    });
+
+    onMounted(fetchParticipant);
 
     return {
       participant,
@@ -141,6 +177,10 @@ export default {
       editing,
       saveChanges,
       cancelEdit,
+      getCityName,
+      getCountryName,
+      formatDate,
+      fullName,
       logout
     };
   }
