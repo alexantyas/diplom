@@ -62,35 +62,27 @@ export default {
     const router = useRouter();
     const store = useStore();
 
-    const user = ref(JSON.parse(localStorage.getItem('user')) || {});
+    // user из Vuex (реактивно)
+    const user = computed(() => store.state.user);
+
     const competitions = ref([]);
     const applications = ref([]);
     const myAppParts = ref([]); // только индивидуальные участники
 
-    const token = localStorage.getItem("access_token");
-
-    const isCoach = computed(() => user.value.role_id === 2);
-    const isAthlete = computed(() => user.value.role_id === 3);
+    const isCoach = computed(() => user.value && user.value.role_id === 2);
+    const isAthlete = computed(() => user.value && user.value.role_id === 3);
 
     onMounted(async () => {
       try {
         const [compRes, appRes, individualRes] = await Promise.all([
-          fetch("http://localhost:8000/competitions/", {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          fetch("http://localhost:8000/applications/", {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
-          fetch("http://localhost:8000/applications/participants/individual/", {
-            headers: { Authorization: `Bearer ${token}` }
-          }),
+          api.get('/competitions/'),
+          api.get('/applications/'),
+          api.get('/applications/participants/individual/')
         ]);
-
-        competitions.value = await compRes.json();
-        applications.value = await appRes.json();
-
-        const allIndividual = await individualRes.json();
-        myAppParts.value = allIndividual.filter(p => p.user_id === user.value.id);
+        competitions.value = compRes.data;
+        applications.value = appRes.data;
+        const allIndividual = individualRes.data;
+        myAppParts.value = allIndividual.filter(p => p.user_id === user.value?.id);
       } catch (error) {
         console.error("Ошибка при загрузке данных:", error);
       }
@@ -101,11 +93,11 @@ export default {
     );
 
     const hasApplied = (competitionId) => {
-  return myAppParts.value.some(p => {
-    const app = applications.value.find(a => a.id === p.application_id);
-    return app?.competition_id === competitionId;
-  });
-};
+      return myAppParts.value.some(p => {
+        const app = applications.value.find(a => a.id === p.application_id);
+        return app?.competition_id === competitionId;
+      });
+    };
 
     const applyToCompetition = async (competitionId) => {
       if (hasApplied(competitionId)) return;
@@ -140,19 +132,7 @@ export default {
             team_participants: teamPayload
           };
 
-          const appRes = await fetch("http://localhost:8000/applications/", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify(payload)
-          });
-
-          if (!appRes.ok) {
-            const err = await appRes.text();
-            throw new Error(err);
-          }
+          await api.post('/applications/', payload);
 
         } else if (isAthlete.value) {
           // Подача индивидуальной заявки
@@ -166,19 +146,8 @@ export default {
             }]
           };
 
-          const appRes = await fetch("http://localhost:8000/applications/", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${token}`
-            },
-            body: JSON.stringify(payload)
-          });
+          await api.post('/applications/', payload);
 
-          if (!appRes.ok) {
-            const err = await appRes.text();
-            throw new Error(err);
-          }
         } else {
           alert("Ваша роль не позволяет подать заявку");
           return;
@@ -188,8 +157,13 @@ export default {
         location.reload();
 
       } catch (error) {
+        // Можно дополнительно показать detail из ответа, если нужно:
+        let msg = "❌ Не удалось подать заявку";
+        if (error.response && error.response.data && error.response.data.detail) {
+          msg += `: ${error.response.data.detail}`;
+        }
         console.error("❌ Ошибка при подаче заявки:", error);
-        alert("❌ Не удалось подать заявку");
+        alert(msg);
       }
     };
 
@@ -214,4 +188,6 @@ export default {
   }
 };
 </script>
+
+
 

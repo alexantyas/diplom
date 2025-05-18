@@ -1,3 +1,4 @@
+import Home from '@/views/HomePage.vue'
 import { createRouter, createWebHistory } from 'vue-router';
 import store from '@/store';
 import LoginPage from '@/views/LoginPage.vue';
@@ -11,8 +12,8 @@ import ParticipantsPage from '@/views/ParticipantsPage.vue';
 import BracketPage from '@/views/BracketPage.vue';
 
 const routes = [
-  { path: '/login', component: LoginPage },
-  { path: '/', redirect: '/login' },
+   { path: '/login', component: LoginPage },
+  { path: '/', component: Home, meta: { requiresAuth: true } },
   { path: '/register-participant', component: () => import('@/views/RegisterParticipant.vue') },
   { path: '/register-coach', component: () => import('@/views/RegisterCoach.vue') },
   {

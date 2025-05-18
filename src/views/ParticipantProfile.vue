@@ -74,11 +74,11 @@ export default {
 
     const fetchProfileData = async () => {
   // 1. Получить профиль пользователя
-  const userResp = await api.get('/users/me', { headers: { Authorization: `Bearer ${token}` } });
+  const userResp = await api.get('/users/me');
   user.value = userResp.data;
 
   // 2. Получить все application_participants для этого user_id
-  const apResp = await api.get('/applications/participants/');
+  const apResp = await api.get('/applications/participants/individual');
   const myAppParts = apResp.data.filter(ap => ap.user_id === user.value.id);
 
   // 3. Получить все заявки и все соревнования

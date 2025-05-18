@@ -33,41 +33,44 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import { loginUser } from '@/api';
+import api from '@/api';
 
 export default {
   setup() {
     const router = useRouter();
-    const store = useStore(); // используем useStore
+    const store = useStore();
     const username = ref('');
     const password = ref('');
     const errorMessage = ref('');
 
     const login = async () => {
       errorMessage.value = '';
+      console.log('НАЖАЛИ ЛОГИН');
+
       try {
-        // Получение токена
         const response = await loginUser(username.value, password.value);
+        console.log('Получили ответ на логин:', response.data);
         const { access_token } = response.data;
         localStorage.setItem('token', access_token);
 
-        // Получение пользователя
-        const userResponse = await fetch('http://127.0.0.1:8000/users/me', {
-          headers: { Authorization: `Bearer ${access_token}` }
-        });
-        const user = await userResponse.json();
-        store.commit('setUser', user); // <<< ОБЯЗАТЕЛЬНО!
+        const userResponse = await api.get('/users/me');
+        console.log('Получили пользователя:', userResponse.data);
+        const user = userResponse.data;
+        store.commit('setUser', user);
+        localStorage.setItem('user', JSON.stringify(user));
 
-        // Редирект по роли
+        // ---- Редиректим по роли ----
         if (user.role_id === 1) {
-          router.push('/create');
+          router.push('/create'); // Админ/организатор
         } else if (user.role_id === 2) {
-          router.push('/profile-coach');
+          router.push('/profile-coach'); // Тренер
         } else if (user.role_id === 3) {
-          router.push('/profile-participant');
+          router.push('/profile-participant'); // Участник
         } else {
-          router.push('/');
+          router.push('/'); // fallback
         }
       } catch (err) {
+        console.error('Ошибка логина:', err);
         errorMessage.value = 'Неверный логин или пароль';
       }
     };
@@ -76,4 +79,3 @@ export default {
   }
 };
 </script>
-

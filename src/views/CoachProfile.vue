@@ -55,13 +55,17 @@
 import { ref, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
-
+import api from '@/api';
 export default {
   setup() {
     const store = useStore();
     const router = useRouter();
 
-    const user = ref(JSON.parse(localStorage.getItem('user')) || {});
+    const user = ref({});
+onMounted(async () => {
+  const resp = await api.get('/users/me');
+  user.value = resp.data;
+});
 
     const logout = () => {
       store.commit('logout');
