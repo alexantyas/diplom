@@ -8,15 +8,30 @@
 
     <div v-else class="row g-4">
       <div class="col-12" v-for="comp in competitions" :key="comp.id">
-        <div class="card shadow-sm p-4" style="cursor: pointer;" @click="openCompetition(comp.id)">
+        <div
+          class="card shadow-sm p-4"
+          style="cursor: pointer;"
+          @click="openCompetition(comp.id)"
+        >
           <div class="card-body">
             <div class="d-flex justify-content-between align-items-start flex-wrap">
               <div>
                 <h5 class="card-title">{{ comp.name }}</h5>
-                <p class="mb-1"><strong>Город:</strong> {{ comp.venue.city_name }}</p>
-                <p class="mb-1"><strong>Место:</strong> {{ comp.venue.name }}</p>
-                <p class="mb-1"><strong>Дата:</strong> {{ formatDate(comp.start_date) }}</p>
-                <p class="mb-3"><strong>Тип:</strong> {{ comp.type || '—' }}</p>
+                <p class="mb-1">
+                  <strong>Организатор:</strong> {{ comp.organizer }}
+                </p>
+                <p class="mb-1">
+                  <strong>Город:</strong> {{ comp.venue.city_name }}
+                </p>
+                <p class="mb-1">
+                  <strong>Место:</strong> {{ comp.venue.name }}
+                </p>
+                <p class="mb-1">
+                  <strong>Дата:</strong> {{ formatDate(comp.start_date) }}
+                </p>
+                <p class="mb-3">
+                  <strong>Тип:</strong> {{ comp.type || '—' }}
+                </p>
                 <p class="mb-1">
                   <strong>Заявок:</strong> {{ getApplicationCount(comp.id) }}
                 </p>
@@ -25,7 +40,8 @@
               <div class="d-flex flex-column align-items-end ms-auto">
                 <select
                   v-model="comp.status"
-                  @change.stop="updateStatus(comp)"
+                  @click.stop
+                  @change.stop.prevent="updateStatus(comp, $event)"
                   class="form-select form-select-sm mb-2"
                   style="width: 200px;"
                 >
@@ -61,70 +77,59 @@ export default {
 
     onMounted(async () => {
       const token = localStorage.getItem("access_token");
+      const headers = { Authorization: `Bearer ${token}` };
 
-      // Загружаем соревнования
+      // 1) Соревнования
       try {
-        const res = await fetch("http://localhost:8000/competitions/", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        const data = await res.json();
-        competitions.value = data;
+        const res = await fetch("http://localhost:8000/competitions/", { headers });
+        competitions.value = await res.json();
       } catch (e) {
-        console.error("Ошибка при загрузке соревнований:", e);
+        console.error("Ошибка загрузки соревнований:", e);
       }
 
-      // Загружаем заявки
+      // 2) Заявки
       try {
-        const res = await fetch("http://localhost:8000/applications/", {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-        applications.value = await res.json();
+        const res = await fetch("http://localhost:8000/applications/", { headers });
+        const allApps = await res.json();
+        applications.value = allApps;
       } catch (e) {
-        console.error("Ошибка при загрузке заявок:", e);
+        console.error("Ошибка загрузки заявок:", e);
       }
     });
 
-    // Подсчёт количества заявок на соревнование
-    const getApplicationCount = (competitionId) => {
-      return applications.value.filter(app => app.competition_id === competitionId).length;
-    };
+    const getApplicationCount = (competitionId) =>
+      applications.value.filter(app => app.competition_id === competitionId).length;
 
-    const updateStatus = async (updatedComp) => {
+    const updateStatus = async (comp, event) => {
+      event.stopPropagation();
       const token = localStorage.getItem("access_token");
       try {
-        await fetch(`http://localhost:8000/competitions/${updatedComp.id}`, {
+        await fetch(`http://localhost:8000/competitions/${comp.id}`, {
           method: "PUT",
           headers: {
             "Content-Type": "application/json",
             Authorization: `Bearer ${token}`
           },
-          body: JSON.stringify(updatedComp)
+          body: JSON.stringify(comp)
         });
-      } catch (error) {
-        console.error("Ошибка при обновлении статуса:", error);
+      } catch (e) {
+        console.error("Ошибка обновления статуса:", e);
       }
     };
 
-    const deleteCompetition = async (idToDelete) => {
-      if (!confirm('Вы уверены, что хотите удалить это соревнование?')) return;
-
+    const deleteCompetition = async (id) => {
+      if (!confirm("Удалить соревнование?")) return;
       const token = localStorage.getItem("access_token");
-
       try {
-        const res = await fetch(`http://localhost:8000/competitions/${idToDelete}`, {
+        const res = await fetch(`http://localhost:8000/competitions/${id}`, {
           method: "DELETE",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
+          headers: { Authorization: `Bearer ${token}` }
         });
-
-        if (!res.ok) throw new Error("Ошибка при удалении");
-
-        // Убираем с фронта
-        competitions.value = competitions.value.filter(c => c.id !== idToDelete);
+        if (!res.ok) throw new Error();
+        competitions.value = competitions.value.filter(c => c.id !== id);
       } catch (e) {
-        console.error(e);
-        alert("❌ Не удалось удалить соревнование");
+        console.error("Ошибка удаления:", e);
+        alert("Не удалось удалить");
       }
     };
 
@@ -132,18 +137,18 @@ export default {
       router.push(`/competition/${id}`);
     };
 
-    const formatDate = (dateStr) => {
-      const date = new Date(dateStr);
-      return date.toLocaleDateString("ru-RU");
+    const formatDate = (str) => {
+      const d = new Date(str);
+      return isNaN(d) ? "—" : d.toLocaleDateString("ru-RU");
     };
 
     return {
       competitions,
       applications,
+      getApplicationCount,
       updateStatus,
       deleteCompetition,
       openCompetition,
-      getApplicationCount,
       formatDate
     };
   }
