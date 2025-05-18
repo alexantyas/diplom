@@ -36,28 +36,68 @@
       <h5 class="mb-3">Заявки на участие</h5>
       <div v-if="applications.length" class="row g-3">
         <div class="col-md-4" v-for="app in applications" :key="app.id">
-          <div
-            class="card p-3 shadow-sm"
-            style="cursor: pointer"
-            @click="handleCardClick(app)"
-          >
-            <p>
-              <strong>Тренер:</strong>
-              <template v-if="app.user">
-                {{ app.user.last_name }}
-                {{ app.user.first_name }}
-                <span v-if="app.user.middle_name">{{ app.user.middle_name }}</span>
-              </template>
-              <template v-else>—</template>
-            </p>
-            <p>
-              <strong>Тип заявки:</strong>
-              {{ app.request_type_id === 2 ? 'Командная' : 'Индивидуальная' }}
-            </p>
-            <p>
-              <strong>Статус заявки:</strong>
-              {{ deriveStatus(app) }}
-            </p>
+          <div class="card p-3 shadow-sm">
+            <!-- детали заявки -->
+            <div @click="handleCardClick(app)" style="cursor: pointer;">
+              <p>
+                <strong>
+                  {{ app.request_type_id === 2 ? 'Тренер' : 'Участник' }}:
+                </strong>
+                <template v-if="app.request_type_id === 2">
+                  {{ formatName(app.user) }}
+                </template>
+                <template v-else>
+                  {{ app.participantUser ? formatName(app.participantUser) : '—' }}
+                </template>
+              </p>
+              <p>
+                <strong>Тип заявки:</strong>
+                {{ app.request_type_id === 2 ? 'Командная' : 'Индивидуальная' }}
+              </p>
+              <p>
+                <strong>Статус заявки:</strong>
+                <span
+                  :class="{
+                    'badge bg-secondary':  app.status === 'pending' && !app.isUpdating,
+                    'badge bg-success':    app.status === 'approved' && !app.isUpdating,
+                    'badge bg-danger':     app.status === 'rejected' && !app.isUpdating,
+                    'badge bg-warning text-dark': app.isUpdating
+                  }"
+                >
+                  <template v-if="app.isUpdating">
+                    <span class="spinner-border spinner-border-sm me-1"></span>
+                    {{ statusMap[app.pendingStatus] }}…
+                  </template>
+                  <template v-else>{{ statusMap[app.status] }}</template>
+                </span>
+              </p>
+            </div>
+
+            <!-- кнопки управления -->
+            <div class="d-flex justify-content-between mt-2">
+              <button
+                class="btn btn-sm btn-outline-success"
+                :disabled="app.status === 'approved' || app.isUpdating"
+                @click="changeStatus(app, 'approved')"
+              >
+                <span
+                  v-if="app.isUpdating && app.pendingStatus==='approved'"
+                  class="spinner-border spinner-border-sm me-1"
+                ></span>
+                Утвердить
+              </button>
+              <button
+                class="btn btn-sm btn-outline-danger"
+                :disabled="app.status === 'rejected' || app.isUpdating"
+                @click="changeStatus(app, 'rejected')"
+              >
+                <span
+                  v-if="app.isUpdating && app.pendingStatus==='rejected'"
+                  class="spinner-border spinner-border-sm me-1"
+                ></span>
+                Отклонить
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -141,92 +181,135 @@ export default {
     const competition = ref(null);
     const applications = ref([]);
 
-    // для модалок
+    // модалки
     const indPart = ref(null);
     const indUser = ref(null);
     const teamMembers = ref([]);
     const coach = ref(null);
     const coachLoading = ref(false);
 
+    // отображение статусов
+    const statusMap = {
+      pending:  "На рассмотрении",
+      approved: "Утверждена",
+      rejected: "Отклонена",
+    };
+
     const token = localStorage.getItem("access_token");
-    const headers = { Authorization: `Bearer ${token}` };
+    const headers = {
+      "Content-Type":  "application/json",
+      Authorization:   `Bearer ${token}`,
+    };
+
+    // форматирование ФИО
+    const formatName = (u) =>
+      u
+        ? `${u.last_name} ${u.first_name}${u.middle_name ? " " + u.middle_name : ""}`
+        : "—";
+
+    // 1) Загрузка соревнования
+    const loadCompetition = async () => {
+      const res = await fetch("http://localhost:8000/competitions/", { headers });
+      const all = await res.json();
+      competition.value = all.find((c) => c.id === compId) || null;
+    };
+
+    // 2) Загрузка заявок + подгрузка participantUser для инд. заявок
+    const loadApplications = async () => {
+      const res = await fetch(
+        `http://localhost:8000/applications/?competition_id=${compId}`,
+        { headers }
+      );
+      const data = await res.json();
+
+      // инициализируем
+      applications.value = data.map((app) => ({
+        ...app,
+        isUpdating:      false,
+        pendingStatus:   null,
+        participantUser: null,
+      }));
+
+      // подгружаем участника для индивидуальных
+      await Promise.all(
+        applications.value.map(async (app) => {
+          if (
+            app.request_type_id !== 2 &&
+            app.individual_participants?.length
+          ) {
+            const uid = app.individual_participants[0].user_id;
+            try {
+              const r = await fetch(`http://localhost:8000/users/${uid}`, { headers });
+              if (r.ok) app.participantUser = await r.json();
+            } catch (e) {
+              console.error("Ошибка загрузки участника:", e);
+            }
+          }
+        })
+      );
+    };
 
     onMounted(async () => {
-      // 1) Получаем список всех соревнований и ищем своё
-      try {
-        const r = await fetch("http://localhost:8000/competitions/", { headers });
-        const all = await r.json();
-        competition.value = all.find((c) => c.id === compId) || null;
-      } catch (e) {
-        console.error("Ошибка соревнований:", e);
-      }
-
-      // 2) Получаем заявки для этого соревнования
-      try {
-        const r = await fetch(
-          `http://localhost:8000/applications/?competition_id=${compId}`,
-          { headers }
-        );
-        applications.value = await r.json();
-      } catch (e) {
-        console.error("Ошибка заявок:", e);
-      }
+      await loadCompetition();
+      await loadApplications();
     });
 
-    const deriveStatus = (app) => {
-      if (app.request_type_id !== 2) {
-        return app.individual_participants?.[0]?.status || "—";
+    // Смена статуса с мгновенным UI-feedback
+    const changeStatus = async (app, newStatus) => {
+      app.isUpdating = true;
+      app.pendingStatus = newStatus;
+      try {
+        const res = await fetch(
+          `http://localhost:8000/applications/${app.id}`,
+          {
+            method: "PATCH",
+            headers,
+            body: JSON.stringify({ status: newStatus }),
+          }
+        );
+        if (res.ok) {
+          app.status = newStatus;
+        } else console.error("API error", res.status);
+      } catch (e) {
+        console.error("Network error:", e);
+      } finally {
+        app.isUpdating = false;
+        app.pendingStatus = null;
       }
-      return app.team_participants?.[0]?.status || "—";
     };
 
+    // Открытие модалок (ваш код)
     const handleCardClick = async (app) => {
       if (app.request_type_id !== 2) {
-        // Индивидуальная
         indPart.value = app.individual_participants?.[0] || null;
         if (indPart.value) {
-          const u = await fetch(
-            `http://localhost:8000/users/${indPart.value.user_id}`,
-            { headers }
-          );
+          const u = await fetch(`http://localhost:8000/users/${indPart.value.user_id}`, { headers });
           indUser.value = await u.json();
         }
-        new bootstrap.Modal(document.getElementById("individualModal")).show();
+        new bootstrap.Modal("#individualModal").show();
       } else {
-        // Командная
         teamMembers.value = app.team_participants || [];
-        coach.value = null;
         coachLoading.value = true;
         if (app.team_id) {
-          try {
-            const tr = await fetch(
-              `http://localhost:8000/teams/${app.team_id}`,
-              { headers }
-            );
-            const team = await tr.json();
-            const cr = await fetch(
-              `http://localhost:8000/users/${team.coach_id}`,
-              { headers }
-            );
-            coach.value = await cr.json();
-          } catch (err) {
-            console.error("Ошибка загрузки тренера:", err);
-          }
+          const tr = await fetch(`http://localhost:8000/teams/${app.team_id}`, { headers });
+          const t  = await tr.json();
+          const cr = await fetch(`http://localhost:8000/users/${t.coach_id}`, { headers });
+          coach.value = await cr.json();
         }
         coachLoading.value = false;
-        new bootstrap.Modal(document.getElementById("teamModal")).show();
+        new bootstrap.Modal("#teamModal").show();
       }
     };
 
-    const formatDate = (ds) => {
-      const d = new Date(ds);
-      return isNaN(d) ? "—" : d.toLocaleDateString("ru-RU");
-    };
+    const formatDate = (d) =>
+      d ? new Date(d).toLocaleDateString("ru-RU") : "—";
+
+    // статус соревнования
     const statusClass = (st) => ({
-      "badge bg-primary": st === "Открыта",
-      "badge bg-warning text-dark": st === "Проводится",
-      "badge bg-success": st === "Завершено",
-      "badge bg-secondary": true,
+      "badge bg-primary":            st === "Открыта",
+      "badge bg-warning text-dark":  st === "Проводится",
+      "badge bg-success":            st === "Завершено",
+      "badge bg-secondary":          true,
     });
     const statusText = (st) => {
       if (st === "Открыта") return "Заявки принимаются";
@@ -243,9 +326,11 @@ export default {
       teamMembers,
       coach,
       coachLoading,
-      deriveStatus,
+      statusMap,
+      changeStatus,
       handleCardClick,
       formatDate,
+      formatName,
       statusClass,
       statusText,
     };
