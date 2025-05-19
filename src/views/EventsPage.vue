@@ -9,11 +9,11 @@
             <li class="nav-item">
               <router-link to="/events" class="nav-link active">Предстоящие соревнования</router-link>
             </li>
-            <li v-if="user.role === 'coach'" class="nav-item">
+            <li v-if="isCoach" class="nav-item">
               <router-link to="/my-team" class="nav-link">Моя команда</router-link>
             </li>
             <li class="nav-item">
-              <router-link :to="user.role === 'coach' ? '/profile-coach' : '/profile-participant'" class="nav-link">Профиль</router-link>
+              <router-link :to="profileRoute" class="nav-link">Профиль</router-link>
             </li>
           </ul>
           <button @click="logout" class="btn btn-danger">Выход</button>
@@ -63,14 +63,23 @@ export default {
     const store = useStore();
 
     // user из Vuex (реактивно)
-    const user = computed(() => store.state.user);
+    const user = computed(() => store.state.user || {});
 
     const competitions = ref([]);
     const applications = ref([]);
-    const myAppParts = ref([]); // только индивидуальные участники
+    const myAppParts = ref([]);
 
+    // ВНИМАНИЕ: Только по role_id!
     const isCoach = computed(() => user.value && user.value.role_id === 2);
     const isAthlete = computed(() => user.value && user.value.role_id === 3);
+
+    const profileRoute = computed(() =>
+      user.value && user.value.role_id === 2
+        ? '/profile-coach'
+        : user.value && user.value.role_id === 3
+        ? '/profile-participant'
+        : '/login'
+    );
 
     onMounted(async () => {
       try {
@@ -81,10 +90,9 @@ export default {
         ]);
         competitions.value = compRes.data;
         applications.value = appRes.data;
-        const allIndividual = individualRes.data;
-        myAppParts.value = allIndividual.filter(p => p.user_id === user.value?.id);
+        myAppParts.value = individualRes.data.filter(p => p.user_id === user.value?.id);
       } catch (error) {
-        console.error("Ошибка при загрузке данных:", error);
+        router.push('/login');
       }
     });
 
@@ -100,6 +108,7 @@ export default {
     };
 
     const applyToCompetition = async (competitionId) => {
+      console.log("user:", user.value);
       if (hasApplied(competitionId)) return;
 
       try {
@@ -126,7 +135,7 @@ export default {
 
           const payload = {
             competition_id: competitionId,
-            request_type_id: 2, // командная
+            request_type_id: 2,
             team_id: user.value.team_id,
             request_date: new Date().toISOString().replace('Z', ''),
             team_participants: teamPayload
@@ -138,7 +147,7 @@ export default {
           // Подача индивидуальной заявки
           const payload = {
             competition_id: competitionId,
-            request_type_id: 1, // индивидуальная
+            request_type_id: 1,
             request_date: new Date().toISOString().replace('Z', ''),
             individual_participants: [{
               user_id: user.value.id,
@@ -154,10 +163,8 @@ export default {
         }
 
         alert("✅ Заявка успешно подана");
-        location.reload();
 
       } catch (error) {
-        // Можно дополнительно показать detail из ответа, если нужно:
         let msg = "❌ Не удалось подать заявку";
         if (error.response && error.response.data && error.response.data.detail) {
           msg += `: ${error.response.data.detail}`;
@@ -183,11 +190,10 @@ export default {
       hasApplied,
       applyToCompetition,
       logout,
-      formatDate
+      formatDate,
+      isCoach,
+      profileRoute,
     };
   }
 };
 </script>
-
-
-
