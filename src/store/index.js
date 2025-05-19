@@ -1,7 +1,7 @@
 // src/store/index.js
 import { createStore } from 'vuex';
 import api from '@/api';
-import { getApprovedApplications, createMatchesBatch, getMatchesByCompetition } from '@/api';
+import { getApprovedApplications, createMatchesBatch } from '@/api';
 
 export default createStore({
   state: {
@@ -96,7 +96,10 @@ export default createStore({
       state.participants.splice(index, 1);
       localStorage.setItem('participants', JSON.stringify(state.participants));
     },
-
+    async loadSchedule({ commit }, competitionId) {
+      const { data } = await getMatchesByCompetition(competitionId);
+      commit('setSchedule', data);
+    },
     // --- Расписание матчей ---
     setSchedule(state, schedule) {
       state.schedule = schedule;
@@ -179,42 +182,34 @@ export default createStore({
       if (data.judges)      commit('setJudges', data.judges);
       return true;
     },
-     
+
     // --- Загрузка и сохранение заявок и расписания ---
     async loadApprovedApplications({ commit }, competitionId) {
-      // GET /applications?competition_id=…
       const { data } = await getApprovedApplications(competitionId);
       commit('setApplications', data);
     },
+    async saveScheduleToServer({ state }, competitionId) {
+    if (!competitionId) throw new Error('Competition ID is missing');
 
-     
-async loadScheduleFromServer({ commit }, competitionId) {
-      // GET /matches?competition_id=…
-      const { data } = await getMatchesByCompetition(competitionId);
-      commit('setSchedule', data);
-    },
-
-
-   async saveScheduleToServer({ state, commit }, competitionId) {
-  const matches = state.schedule.map(m => ({
-    red_id:      m.red_id ?? null,
-    blue_id:     m.blue_id ?? null,
-    competition_id: m.competition_id ?? state.competition?.id ?? null,
-    judge_id:    m.judge_id ?? null,
-    referee_id:  m.referee_id ?? null,
-    match_time:  m.time && m.time.length === 5
-                  ? new Date(`2025-05-19T${m.time}:00`).toISOString()
-                  : null,
-    score:       m.points ?? null,
-    comment:     m.note ?? null,
-    winner_id:   m.result === m.fighter1 ? m.red_user_id
-               : m.result === m.fighter2 ? m.blue_user_id
-               : null
+    // Предполагаем, что в state.schedule у каждого матча есть необходимые ID:
+    const matches = state.schedule
+  .filter(m => m.red_user_id && m.blue_user_id)
+  .map(m => ({
+    red_id:        m.red_user_id,
+    blue_id:       m.blue_user_id,
+    competition_id: m.competition_id,
+    judge_id:      m.judge_id || null,
+    referee_id:    m.referee_id || null,
+    match_time:    m.time ? new Date(m.time).toISOString() : null,
+    score:         m.points ?? null,
+    comment:       m.note   ?? null,
   }));
 
-  const { data } = await createMatchesBatch(matches);
-  commit('setSchedule', data);
-}, // --- Сохранение результатов турнира в localStorage ---
+    // Отправляем правильный пакет
+    await createMatchesBatch(matches);
+  },
+
+    // --- Сохранение результатов турнира в localStorage ---
     async saveResults({ state }) {
       const results = {
         competition: state.competition,

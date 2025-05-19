@@ -68,13 +68,12 @@
 <script>
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
-
 export default {
   setup() {
     const competitions = ref([]);
     const applications = ref([]);
     const router = useRouter();
-
+    
     onMounted(async () => {
       const token = localStorage.getItem("access_token");
       const headers = { Authorization: `Bearer ${token}` };
