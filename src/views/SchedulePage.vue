@@ -1,171 +1,120 @@
 <template>
   <div class="container-fluid mt-3">
-    <!-- Фильтры и кнопки управления -->
+    <!-- Фильтры -->
     <div class="row mb-3">
       <div class="col-md-6">
-        <label class="form-label">Выберите весовую категорию</label>
+        <label class="form-label">Весовая категория</label>
         <select v-model="selectedCategory" class="form-select">
-          <option value="">Все категории</option>
-          <option v-for="category in uniqueCategories" :key="category" :value="category">
-            {{ category }}
-          </option>
+          <option value="">Все</option>
+          <option v-for="c in uniqueCategories" :key="c" :value="c">{{ c }}</option>
         </select>
       </div>
       <div class="col-md-6">
-        <label class="form-label">Выберите судью</label>
+        <label class="form-label">Судья</label>
         <select v-model="selectedJudge" class="form-select">
-          <option value="">Все судьи</option>
-          <option v-for="judge in judges" :key="judge.name" :value="judge.name">
-            {{ judge.name }}
-          </option>
+          <option value="">Все</option>
+          <option v-for="j in judges" :key="j.name" :value="j.name">{{ j.name }}</option>
         </select>
       </div>
     </div>
 
-    <!-- Кнопки управления -->
+    <!-- Кнопки -->
     <div class="d-flex gap-2 mb-3">
-      <button @click="generateSchedule" class="btn btn-secondary">Сформировать расписание</button>
-      <button @click="addMatch" class="btn btn-secondary">Добавить схватку</button>
-      <button @click="saveSchedule" class="btn btn-secondary">Сохранить расписание</button>
-      <button @click="saveResults" class="btn btn-secondary">Сохранить результаты</button>
+      <button @click="generateSchedule" class="btn btn-secondary">
+        Сформировать и сохранить
+      </button>
+      <button @click="addMatch" class="btn btn-secondary">
+        Добавить схватку
+      </button>
+      <button @click="saveSchedule" class="btn btn-secondary">
+        Сохранить расписание
+      </button>
+      <button @click="saveResults" class="btn btn-secondary">
+        Сохранить результаты
+      </button>
+      <button @click="resetFilters" class="btn btn-outline-secondary btn-sm">
+        Сбросить фильтры
+      </button>
     </div>
 
-    <!-- Общая функция для отображения таблицы -->
-    <template v-for="(section, index) in sections" :key="index">
-      <h5 :class="{ 'mt-4': index > 0 }">{{ section.title }}</h5>
+    <!-- Таблицы -->
+    <template v-for="(sec, idx) in sections" :key="idx">
+      <h5 :class="{ 'mt-4': idx>0 }">{{ sec.title }}</h5>
       <div class="table-responsive">
         <table class="table table-bordered">
           <thead class="table-light">
             <tr>
-              <th>#</th>
-              <th>Этап</th>
-              <th>Весовая категория</th>
-              <th>Спортсмен 1</th>
-              <th>Спортсмен 2</th>
-              <th>Время</th>
-              <th>Судья стола</th>
-              <th>Рефери</th>
-              <th>Ковер</th>
-              <th>Результат</th>
-              <th>Примечание</th>
-              <th>Баллы</th>
-              <th>Действие</th>
+              <th>#</th><th>Этап</th><th>Категория</th>
+              <th>Спортсмен 1</th><th>Спортсмен 2</th><th>Время</th>
+              <th>Судья</th><th>Рефери</th><th>Ковер</th>
+              <th>Результат</th><th>Примечание</th><th>Баллы</th><th>Статус</th>
             </tr>
           </thead>
           <tbody>
-            <tr v-for="(match, matchIndex) in section.matches" 
-                :key="matchIndex"
-                :class="[
-                  section.rowClass,
-                  { 'bracket-match': isBracketMatch(match) }
-                ]"
-                :draggable="section.draggable && !isBracketMatch(match)"
-                @dragstart="section.draggable && !isBracketMatch(match) && dragStart(matchIndex)"
-                @drop="section.draggable && !isBracketMatch(match) && drop(matchIndex)"
-                @dragover.prevent>
-              <td>{{ matchIndex + 1 }}</td>
+            <tr
+              v-for="(m,i) in sec.matches" :key="i"
+              :class="[ sec.rowClass, { 'bracket-match': isBracketMatch(m) } ]"
+            >
+              <td>{{ i+1 }}</td>
               <td>
-                <span v-if="match.stage" class="badge bg-info">{{ match.stage }}</span>
+                <span v-if="m.stage" class="badge bg-info">{{ m.stage }}</span>
                 <span v-else>-</span>
               </td>
+              <td><span class="badge bg-secondary">{{ m.category }}</span></td>
+              <td><span :class="{ 'text-success fw-bold': m.result===m.fighter1 }">{{ m.fighter1 }}</span></td>
+              <td><span :class="{ 'text-success fw-bold': m.result===m.fighter2 }">{{ m.fighter2 }}</span></td>
               <td>
-                <span class="badge bg-secondary">{{ match.category }}</span>
+                <input type="time" v-model="m.time" class="form-control form-control-sm"
+                       @change="updateMatch(m)" />
               </td>
               <td>
-                <span :class="{ 'text-success fw-bold': match.result === match.fighter1 }">
-                  {{ match.fighter1 }}
-                </span>
-              </td>
-              <td>
-                <span :class="{ 'text-success fw-bold': match.result === match.fighter2 }">
-                  {{ match.fighter2 }}
-                </span>
-              </td>
-              <td>
-                <input 
-                  type="time" 
-                  v-model="match.time" 
-                  class="form-control form-control-sm"
-                  @change="updateMatch(match)"
-                >
-              </td>
-              <td>
-                <select 
-                  v-model="match.judge" 
-                  class="form-select form-select-sm"
-                  @change="updateMatch(match)"
-                >
-                  <option value="">Выберите судью</option>
-                  <option v-for="judge in judges" :key="judge.name" :value="judge.name">
-                    {{ judge.name }}
-                  </option>
+                <select v-model="m.judge" class="form-select form-select-sm" @change="updateMatch(m)">
+                  <option value="">–</option>
+                  <option v-for="j in judges" :key="j.name" :value="j.name">{{ j.name }}</option>
                 </select>
               </td>
               <td>
-                <select 
-                  v-model="match.referee" 
-                  class="form-select form-select-sm"
-                  @change="updateMatch(match)"
-                >
-                  <option value="">Выберите рефери</option>
-                  <option v-for="judge in judges" :key="judge.name" :value="judge.name">
-                    {{ judge.name }}
-                  </option>
+                <select v-model="m.referee" class="form-select form-select-sm" @change="updateMatch(m)">
+                  <option value="">–</option>
+                  <option v-for="j in judges" :key="j.name" :value="j.name">{{ j.name }}</option>
                 </select>
               </td>
               <td>
-                <input 
-                  v-model="match.tatami" 
-                  class="form-control form-control-sm"
-                  @change="updateMatch(match)"
-                >
+                <input v-model="m.tatami" class="form-control form-control-sm" @change="updateMatch(m)" />
               </td>
               <td>
-                <select 
-                  v-if="!isBracketMatch(match) || !match.result"
-                  v-model="match.result" 
-                  class="form-select form-select-sm"
-                  @change="updateMatch(match)"
-                >
-                  <option value="">Не завершен</option>
-                  <option :value="match.fighter1">{{ match.fighter1 }}</option>
-                  <option :value="match.fighter2">{{ match.fighter2 }}</option>
-                </select>
-                <span v-else class="text-success">{{ match.result }}</span>
+                <template v-if="!isBracketMatch(m) || !m.result">
+                  <select v-model="m.result" class="form-select form-select-sm" @change="updateMatch(m)">
+                    <option value="">Не завершен</option>
+                    <option :value="m.fighter1">{{ m.fighter1 }}</option>
+                    <option :value="m.fighter2">{{ m.fighter2 }}</option>
+                  </select>
+                </template>
+                <span v-else class="text-success">{{ m.result }}</span>
               </td>
               <td>
-                <input 
-                  v-if="!isBracketMatch(match)"
-                  v-model="match.note" 
-                  class="form-control form-control-sm"
-                  @change="updateMatch(match)"
-                >
-                <span v-else>{{ match.note || '-' }}</span>
+                <template v-if="!isBracketMatch(m)">
+                  <input v-model="m.note" class="form-control form-control-sm" @change="updateMatch(m)" />
+                </template>
+                <span v-else>{{ m.note||'-' }}</span>
               </td>
               <td>
-                <input 
-                  v-if="!isBracketMatch(match) || !match.result"
-                  v-model="match.points" 
-                  type="number" 
-                  class="form-control form-control-sm"
-                  @change="updateMatch(match)"
-                >
-                <span v-else>{{ match.points }}</span>
+                <template v-if="!isBracketMatch(m) || !m.result">
+                  <input type="number" v-model.number="m.points"
+                         class="form-control form-control-sm" @change="updateMatch(m)" />
+                </template>
+                <span v-else>{{ m.points }}</span>
               </td>
               <td>
-                <select 
-                  v-if="!isBracketMatch(match) || !match.result"
-                  v-model="match.status" 
-                  class="form-select form-select-sm" 
-                  @change="updateMatchStatus(match, getMatchIndex(match))"
-                >
-                  <option v-for="option in section.statusOptions" 
-                         :key="option.value" 
-                         :value="option.value">
-                    {{ option.label }}
-                  </option>
-                </select>
-                <span v-else class="badge bg-success">Завершен</span>
+                <template v-if="!isBracketMatch(m) || !m.result">
+                  <select v-model="m.status" class="form-select form-select-sm"
+                          @change="updateMatchStatus(m)">
+                    <option v-for="opt in sec.statusOptions" :key="opt.value" :value="opt.value">
+                      {{ opt.label }}
+                    </option>
+                  </select>
+                </template>
+                <span v-else class="badge bg-success">Завершён</span>
               </td>
             </tr>
           </tbody>
@@ -176,358 +125,222 @@
 </template>
 
 <script>
+import { ref, computed, onMounted } from 'vue';
 import { useStore } from 'vuex';
-import { computed, ref } from 'vue';
+import { useRoute } from 'vue-router';
 
 export default {
   setup() {
     const store = useStore();
-    const selectedCategory = ref('');
-    const selectedJudge = ref('');
-    
-    const schedule = computed(() => store.state.schedule || []);
-    const judges = computed(() => store.state.judges || []);
-    const participants = computed(() => store.state.participants || []);
+    const route = useRoute();
+    const competitionId = Number(route.params.id);
 
-    const uniqueCategories = computed(() => {
-      const categories = new Set(schedule.value.map(match => match.category));
-      return Array.from(categories);
+    const selectedCategory = ref('');
+    const selectedJudge    = ref('');
+
+    const applications = computed(() => store.state.applications);
+    const schedule     = computed(() => store.state.schedule);
+    const judges       = computed(() => store.state.judges);
+    const approvedApps = computed(() =>
+      store.state.applications.filter(a => a.status === 'approved')
+    );
+    const uniqueCategories = computed(() =>
+      Array.from(new Set(schedule.value.map(m => m.category)))
+    );
+
+    onMounted(async () => {
+      await store.dispatch('loadApprovedApplications', competitionId);
+      await store.dispatch('loadScheduleFromServer', competitionId);
+      await store.dispatch('generateSchedule', competitionId);
+      await store.dispatch('saveScheduleToServer', competitionId);
     });
 
-    // Обновленная функция фильтрации
-    const filterMatches = (matches) => {
-      return matches.filter(match => {
-        const categoryMatch = !selectedCategory.value || match.category === selectedCategory.value;
-        const judgeMatch = !selectedJudge.value || match.judge === selectedJudge.value;
-        return categoryMatch && judgeMatch;
-      });
-    };
-
-    // Обновленные вычисляемые свойства для разных статусов матчей
-    const upcomingMatches = computed(() => 
-      filterMatches(schedule.value.filter(match => match.status === 'upcoming'))
-        .sort((a, b) => a.time.localeCompare(b.time))
+    // Фильтрация
+    const filterMatches = arr => arr.filter(m =>
+      (!selectedCategory.value  || m.category === selectedCategory.value) &&
+      (!selectedJudge.value     || m.judge    === selectedJudge.value)
     );
 
-    const finishedMatches = computed(() => 
-      filterMatches(schedule.value.filter(match => match.status === 'finished'))
-        .sort((a, b) => b.time.localeCompare(a.time))
+    const upcomingMatches = computed(() =>
+      filterMatches(schedule.value.filter(m => m.status==='upcoming'))
+        .sort((a,b)=>a.time.localeCompare(b.time))
+    );
+    const finishedMatches = computed(() =>
+      filterMatches(schedule.value.filter(m => m.status==='finished'))
+        .sort((a,b)=>b.time.localeCompare(a.time))
     );
 
-    // Получаем индекс матча в общем списке
-    const getMatchIndex = (match) => {
-      return store.state.schedule.findIndex(m => 
-        m.fighter1 === match.fighter1 && 
-        m.fighter2 === match.fighter2 && 
-        m.category === match.category &&
-        m.stage === match.stage // Добавляем проверку этапа
-      );
-    };
-
-    // Обновление статуса матча
-    const updateMatchStatus = (match, index) => {
-      if (index === -1) return;
-      
-      const updatedMatch = { ...match };
-      
-      // Проверяем, не является ли матч частью турнирной сетки
-      const isBracketMatch = match.stage && ['1/16', '1/8', '1/4', '1/2', 'final'].includes(match.stage);
-      
-      // Если матч является частью турнирной сетки и имеет результат,
-      // не позволяем менять его статус обратно
-      if (isBracketMatch && match.result) {
-        console.warn('Нельзя изменить статус завершенного матча турнирной сетки');
-        return;
-      }
-
-      // Сохраняем все данные матча при изменении статуса
-      store.commit('updateMatch', { 
-        index, 
-        match: {
-          ...updatedMatch,
-          category: updatedMatch.category,
-          stage: updatedMatch.stage,
-          fighter1: updatedMatch.fighter1,
-          fighter2: updatedMatch.fighter2,
-          result: updatedMatch.result,
-          points: updatedMatch.points,
-          status: updatedMatch.status
-        }
-      });
-
-      // После обновления статуса сохраняем все расписание
-      saveSchedule();
-    };
-
-    // Обновление времени матча
-    const updateMatch = (match) => {
-      const index = getMatchIndex(match);
-      if (index === -1) return;
-      
-      // Проверяем, не является ли матч частью турнирной сетки
-      const isBracketMatch = match.stage && ['1/16', '1/8', '1/4', '1/2', 'final'].includes(match.stage);
-      
-      // Для матчей турнирной сетки сохраняем все поля
-      if (isBracketMatch) {
-        const updatedMatch = {
-          ...match,
-          category: match.category,    // Явно сохраняем категорию
-          stage: match.stage,          // Явно сохраняем этап
-          fighter1: match.fighter1,    // Явно сохраняем бойцов
-          fighter2: match.fighter2,
-          result: match.result,        // Явно сохраняем результат
-          points: match.points,        // Явно сохраняем очки
-          time: match.time,
-          judge: match.judge,
-          referee: match.referee,
-          tatami: match.tatami
-        };
-        store.commit('updateMatch', { index, match: updatedMatch });
-      } else {
-        store.commit('updateMatch', { index, match });
-      }
-
-      // После любого обновления сохраняем все расписание
-      saveSchedule();
-    };
-
-    const sections = computed(() => [
+    const sections = computed(()=>[
       {
         title: 'Предстоящие схватки',
         matches: upcomingMatches.value,
         rowClass: 'upcoming-match',
-        draggable: false,
-        statusOptions: [
-          { value: 'upcoming', label: 'Не начат' },
-          { value: 'finished', label: 'Завершен' }
+        statusOptions:[
+          {value:'upcoming', label:'Не начат'},
+          {value:'finished', label:'Завершен'}
         ]
       },
       {
         title: 'Завершенные схватки',
         matches: finishedMatches.value,
         rowClass: 'finished-match',
-        draggable: false,
-        statusOptions: [
-          { value: 'finished', label: 'Завершен' },
-          { value: 'upcoming', label: 'Вернуть в ожидание' }
+        statusOptions:[
+          {value:'finished', label:'Завершен'},
+          {value:'upcoming', label:'Вернуть в ожидание'}
         ]
       }
     ]);
 
-    // Сброс фильтров (обновлен)
-    const resetFilters = () => {
-      selectedCategory.value = '';
-      selectedJudge.value = '';
+    const isBracketMatch = m =>
+      m.stage && ['1/16','1/8','1/4','1/2','final'].includes(m.stage);
+
+    // Находим индекс по id
+    const getMatchIndex = m =>
+      schedule.value.findIndex(x => x.id === m.id);
+
+    // Обновление любого поля матча
+    const updateMatch = async m => {
+      const idx = getMatchIndex(m);
+      if (idx===-1) return;
+      store.commit('updateMatch', { index: idx, match: m });
+      await store.dispatch('saveScheduleToServer', competitionId);
     };
+    const updateMatchStatus = async (m) => {
+    await updateMatch(m);
+   };
 
-    const generateSchedule = () => {
-      // Группируем участников по весовым категориям
-      const participantsByWeight = {};
-      participants.value.forEach(participant => {
-        const weight = participant.weight;
-        if (!participantsByWeight[weight]) {
-          participantsByWeight[weight] = [];
-        }
-        participantsByWeight[weight].push(participant);
+const generateSchedule = async () => {
+  selectedCategory.value = '';
+  selectedJudge.value    = '';
+
+  await store.dispatch('loadApprovedApplications', competitionId);
+  const apps = store.state.applications.filter(a => a.status === 'approved');
+  console.log('approved apps:', apps);
+
+  const parts = apps.flatMap(app => {
+    if (app.request_type_id === 2 && Array.isArray(app.team_participants)) {
+      return app.team_participants.map(p => ({
+        id:     p.id,
+        name:   `${p.last_name} ${p.first_name}${p.middle_name ? ` ${p.middle_name}` : ''}`,
+        team:   app.team_id,
+        weight: p.weight,
+      }));
+    }
+    if (
+      Array.isArray(app.individual_participants) &&
+      app.individual_participants.length > 0
+    ) {
+      const ip = app.individual_participants[0];
+      return [{
+        id:     ip.user_id,
+        name:   `${ip.user.last_name} ${ip.user.first_name}${ip.user.middle_name ? ` ${ip.user.middle_name}` : ''}`,
+        team:   null,
+        weight: ip.user.weight,
+      }];
+    }
+    return [];
+  });
+  console.log('flattened participants:', parts);
+
+  const byWeight = {};
+  parts.forEach(p => {
+    ;(byWeight[p.weight] ||= []).push(p);
+  });
+
+  const newSched = [];
+  let num = 1;
+
+  Object.entries(byWeight).forEach(([weight, list]) => {
+    let pool = [...list];
+
+    while (pool.length >= 2) {
+      const fighter1 = pool.shift();
+
+      // Вот здесь изменили условие
+      const opponents = pool.filter(x =>
+        fighter1.team != null
+          ? x.team !== fighter1.team
+          : true
+      );
+
+      if (opponents.length === 0) break;
+
+      const fighter2 = opponents[Math.floor(Math.random() * opponents.length)];
+      pool = pool.filter(x => x !== fighter2);
+
+      const randJ = judges.value[Math.floor(Math.random() * judges.value.length)];
+
+      newSched.push({
+        id:             num++,
+        competition_id: competitionId,
+        category:       `${weight} кг`,
+        fighter1:       fighter1.name,
+        fighter2:       fighter2.name,
+        stage:          '',
+        time:           '',
+        judge:          randJ?.name   || '',
+        referee:        '',
+        tatami:         randJ?.tatami || '1',
+        result:         '',
+        note:           '',
+        points:         0,
+        status:         'upcoming',
       });
+    }
+  });
 
-      let newSchedule = [];
-      let matchNumber = 1;
+  console.log('newSched:', newSched);
 
-      // Для каждой весовой категории
-      Object.entries(participantsByWeight).forEach(([weight, categoryParticipants]) => {
-        // Группируем участников по командам
-        const participantsByTeam = {};
-        categoryParticipants.forEach(participant => {
-          if (!participantsByTeam[participant.team]) {
-            participantsByTeam[participant.team] = [];
-          }
-          participantsByTeam[participant.team].push(participant);
-        });
+  store.commit('setSchedule', newSched);
+  await store.dispatch('saveScheduleToServer', competitionId);
 
-        // Создаем массив для жеребьевки
-        let availableParticipants = [...categoryParticipants];
-        
-        while (availableParticipants.length >= 2) {
-          // Берем первого участника
-          const fighter1 = availableParticipants[0];
-          availableParticipants = availableParticipants.filter(p => p !== fighter1);
+  alert('Расписание сгенерировано и сохранено');
+};
+    onMounted(() => {
+      store.dispatch('loadScheduleFromServer', competitionId);
+    });
 
-          // Ищем подходящего соперника (не из той же команды)
-          const possibleOpponents = availableParticipants.filter(p => p.team !== fighter1.team);
-          
-          if (possibleOpponents.length > 0) {
-            // Случайно выбираем соперника из подходящих кандидатов
-            const randomIndex = Math.floor(Math.random() * possibleOpponents.length);
-            const fighter2 = possibleOpponents[randomIndex];
-            
-            // Удаляем выбранного соперника из доступных участников
-            availableParticipants = availableParticipants.filter(p => p !== fighter2);
 
-            // Случайно выбираем судью
-            const randomJudge = judges.value[Math.floor(Math.random() * judges.value.length)];
-
-            // Создаем схватку
-            newSchedule.push({
-              id: matchNumber++,
-              category: `${weight} кг`,
-              fighter1: fighter1.name,
-              fighter2: fighter2.name,
-              time: '',
-              judge: randomJudge?.name || '',
-              referee: '',
-              tatami: randomJudge?.tatami || '1',
-              result: '',
-              note: '',
-              points: 0,
-              status: 'upcoming'
-            });
-          } else {
-            // Если не нашли подходящего соперника, возвращаем участника обратно в пул
-            availableParticipants.push(fighter1);
-            // Предотвращаем бесконечный цикл, если остались только участники из одной команды
-            if (new Set(availableParticipants.map(p => p.team)).size === 1) {
-              console.warn(`В категории ${weight} кг остались только участники из одной команды`);
-              break;
-            }
-          }
-        }
-
-        // Если остались нераспределенные участники
-        if (availableParticipants.length > 0) {
-          console.warn(`Нераспределенные участники в категории ${weight} кг:`, 
-            availableParticipants.map(p => `${p.name} (${p.team})`).join(', '));
-        }
-      });
-
-      // Сохраняем сгенерированное расписание
-      store.commit('setSchedule', newSchedule);
-      alert('Расписание сгенерировано');
-    };
 
     const addMatch = () => {
-      if (!selectedCategory.value) {
-        alert('Пожалуйста, выберите весовую категорию');
-        return;
-      }
-      
+      if(!selectedCategory.value) return alert('Выберите категорию');
       store.commit('addMatch', {
+        id: Date.now(),
+        competition_id: competitionId,
         category: selectedCategory.value,
-        fighter1: '',
-        fighter2: '',
-        time: '',
-        judge: '',
-        referee: '',
-        tatami: '',
-        result: '',
-        note: '',
-        points: 0,
-        status: 'upcoming'
+        fighter1:'', fighter2:'',
+        stage:'', time:'', judge:'', referee:'', tatami:'', result:'', note:'', points:0, status:'upcoming'
       });
     };
 
-    const saveSchedule = () => {
-      // Сохраняем все матчи
-      store.commit('setSchedule', [
-        ...upcomingMatches.value,
-        ...finishedMatches.value
-      ]);
+    const saveSchedule = async () => {
+      await store.dispatch('saveScheduleToServer', competitionId);
+      alert('Расписание сохранено');
     };
-
-    const saveResults = () => {
-      // Сохраняем все матчи
-      store.commit('saveResults', [
-        ...upcomingMatches.value,
-        ...finishedMatches.value
-      ]);
+    const saveResults = async () => {
+      await store.dispatch('saveResults');
       alert('Результаты сохранены');
     };
 
-    const removeMatch = (index) => {
-      store.commit('removeMatch', index);
-    };
-
-    const dragStart = (index) => {
-      // Логика начала перетаскивания
-    };
-
-    const drop = (index) => {
-      // Логика завершения перетаскивания
-    };
-
-    // Добавляем функцию проверки матча турнирной сетки
-    const isBracketMatch = (match) => {
-      return match.stage && ['1/16', '1/8', '1/4', '1/2', 'final'].includes(match.stage);
-    };
+    
 
     return {
-      sections,
-      selectedCategory,
-      selectedJudge,
-      uniqueCategories,
-      judges,
-      resetFilters,
-      generateSchedule,
-      addMatch,
-      saveSchedule,
-      saveResults,
-      removeMatch,
-      dragStart,
-      drop,
-      updateMatchStatus,
-      updateMatch,
-      getMatchIndex,
-      isBracketMatch
+      judges, selectedCategory, selectedJudge,
+      uniqueCategories, sections,
+      generateSchedule, addMatch, saveSchedule, saveResults,
+      updateMatch, updateMatchStatus, isBracketMatch
     };
   }
 };
 </script>
 
 <style scoped>
-.table th {
-  background-color: #f8f9fa;
-  white-space: nowrap;
-}
-
-.table td {
-  vertical-align: middle;
-}
-
-/* Стили для разных типов схваток */
-.current-match {
-  background-color: rgba(255, 243, 205, 0.5);
-}
-
-.upcoming-match {
-  background-color: rgba(248, 249, 250, 0.5);
-}
-
-.finished-match {
-  background-color: rgba(198, 239, 206, 0.5);
-}
-
-/* Стиль для матчей турнирной сетки */
-.bracket-match {
-  background-color: rgba(207, 226, 255, 0.5);
-}
-
-/* Стиль для победителя */
-.text-success.fw-bold {
-  font-weight: 600;
-}
-
-/* Добавляем стиль для поля времени */
-input[type="time"] {
-  min-width: 110px;
-}
-
-/* Стили для значков */
-.badge {
-  font-size: 0.85em;
-  padding: 0.35em 0.65em;
-}
+.table th { background-color:#f8f9fa; white-space:nowrap; }
+.table td { vertical-align:middle; }
+.upcoming-match { background-color:rgba(248,249,250,0.5); }
+.finished-match { background-color:rgba(198,239,206,0.5); }
+.bracket-match { background-color:rgba(207,226,255,0.5); }
+.text-success.fw-bold { font-weight:600; }
+input[type="time"] { min-width:110px; }
+.badge { font-size:0.85em; padding:0.35em 0.65em; }
 </style>
-
-
-
-

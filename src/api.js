@@ -33,5 +33,22 @@ export async function getProfile(token) {
   // Теперь этот метод не нужен – можно просто: await api.get('/users/me')
   return api.get('/users/me');
 }
+export function getApprovedApplications(competitionId) {
+  return api.get(
+    `/applications?competition_id=${competitionId}`
+  );
+}
+
+// Пакетно создать бои
+export function createMatchesBatch(matches) {
+  return api.post('/matches/batch', matches);
+}
+
+export function getMatchesByCompetition(competitionId) {
+  return api.get(`/matches`, {
+    params: { competition_id: competitionId }
+  });
+}
+
 
 export default api;

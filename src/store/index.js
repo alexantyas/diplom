@@ -1,52 +1,71 @@
+// src/store/index.js
 import { createStore } from 'vuex';
 import api from '@/api';
+import { getApprovedApplications, createMatchesBatch, getMatchesByCompetition } from '@/api';
 
 export default createStore({
   state: {
+    // Пользователь
     user: JSON.parse(localStorage.getItem('user')) || null,
+
+    // Текущие данные соревнования
     competition: JSON.parse(localStorage.getItem('competition')) || null,
-    teams: JSON.parse(localStorage.getItem('teams')) || [],
-    participants: JSON.parse(localStorage.getItem('participants')) || [],
-    schedule: JSON.parse(localStorage.getItem('schedule')) || [],
-    judges: JSON.parse(localStorage.getItem('judges')) || [],
-    users: [],
-    loading: false,
-    error: null,
+    teams:       JSON.parse(localStorage.getItem('teams'))       || [],
+    participants:JSON.parse(localStorage.getItem('participants'))|| [],
+    judges:      JSON.parse(localStorage.getItem('judges'))      || [],
+
+    // Расписание матчей
+    schedule:    JSON.parse(localStorage.getItem('schedule'))    || [],
+
+    // Заявки на участие (новое)
+    applications: [],
+
+    // Результаты турнира и состояние сетки
     tournamentResults: JSON.parse(localStorage.getItem('tournamentResults')) || [],
-    bracketState: JSON.parse(localStorage.getItem('bracketState')) || null
+    bracketState:      JSON.parse(localStorage.getItem('bracketState'))      || null,
+
+    // Для справочника пользователей
+    users:   [],
+    loading: false,
+    error:   null,
   },
 
   mutations: {
-    // Аутентификация
+    // --- Аутентификация ---
     setUser(state, user) {
       state.user = user;
       localStorage.setItem('user', JSON.stringify(user));
     },
     logout(state) {
-  state.user = null;
-  state.competition = null;
-  state.teams = [];
-  state.participants = [];
-  state.schedule = [];
-  state.judges = [];
-  state.tournamentResults = [];
-  state.bracketState = null;
+      state.user = null;
+      state.competition = null;
+      state.teams = [];
+      state.participants = [];
+      state.schedule = [];
+      state.judges = [];
+      state.tournamentResults = [];
+      state.bracketState = null;
+      state.applications = [];
 
-  // Удаляем все ключи, кроме registeredUsers
-  Object.keys(localStorage).forEach(key => {
-    if (key !== 'registeredUsers') {
-      localStorage.removeItem(key);
-    }
-  });
-},
+      Object.keys(localStorage).forEach(key => {
+        if (key !== 'registeredUsers') {
+          localStorage.removeItem(key);
+        }
+      });
+    },
 
-    // Управление соревнованием
+    // --- Заявки ---
+    setApplications(state, apps) {
+      state.applications = apps;
+    },
+
+    // --- Соревнование ---
     setCompetition(state, competition) {
       state.competition = competition;
       localStorage.setItem('competition', JSON.stringify(competition));
     },
 
-    // Управление командами
+    // --- Команды ---
     setTeams(state, teams) {
       state.teams = teams;
       localStorage.setItem('teams', JSON.stringify(teams));
@@ -60,7 +79,7 @@ export default createStore({
       localStorage.setItem('teams', JSON.stringify(state.teams));
     },
 
-    // Управление участниками
+    // --- Участники ---
     setParticipants(state, participants) {
       state.participants = participants;
       localStorage.setItem('participants', JSON.stringify(participants));
@@ -78,51 +97,31 @@ export default createStore({
       localStorage.setItem('participants', JSON.stringify(state.participants));
     },
 
-    // Управление расписанием
+    // --- Расписание матчей ---
     setSchedule(state, schedule) {
-      console.log('Сохранение расписания в хранилище:', schedule);
       state.schedule = schedule;
       localStorage.setItem('schedule', JSON.stringify(schedule));
-      console.log('Расписание после сохранения:', state.schedule);
     },
     addMatch(state, match) {
-      console.log('Добавление матча в расписание:', match);
       state.schedule.push(match);
       localStorage.setItem('schedule', JSON.stringify(state.schedule));
-      console.log('Расписание после добавления матча:', state.schedule);
     },
     updateMatch(state, { index, match }) {
-      console.log('Обновление матча:', { index, match });
       if (index >= 0 && index < state.schedule.length) {
-        // Проверяем наличие всех необходимых полей
-        const updatedMatch = {
-          ...state.schedule[index], // Сначала берем все существующие поля
-          ...match, // Затем применяем новые значения
-          // Явно указываем важные поля, предпочитая новые значения, но сохраняя старые если новых нет
-          category: match.category || state.schedule[index].category,
-          fighter1: match.fighter1 || state.schedule[index].fighter1,
-          fighter2: match.fighter2 || state.schedule[index].fighter2,
-          stage: match.stage || state.schedule[index].stage,
-          status: match.status || state.schedule[index].status,
-          result: match.result || state.schedule[index].result,
-          points: match.points || state.schedule[index].points,
-          points1: match.points1 || state.schedule[index].points1,
-          points2: match.points2 || state.schedule[index].points2
+        // Мержим новое в старое
+        state.schedule[index] = { 
+          ...state.schedule[index], 
+          ...match 
         };
-        
-        console.log('Обновленный матч перед сохранением:', updatedMatch);
-        state.schedule[index] = updatedMatch;
-        console.log('Матч после обновления:', state.schedule[index]);
+        localStorage.setItem('schedule', JSON.stringify(state.schedule));
       }
-      localStorage.setItem('schedule', JSON.stringify(state.schedule));
-      console.log('Все расписание после обновления:', state.schedule);
     },
     removeMatch(state, index) {
       state.schedule.splice(index, 1);
       localStorage.setItem('schedule', JSON.stringify(state.schedule));
     },
 
-    // Управление судьями
+    // --- Судьи ---
     setJudges(state, judges) {
       state.judges = judges;
       localStorage.setItem('judges', JSON.stringify(judges));
@@ -140,6 +139,7 @@ export default createStore({
       localStorage.setItem('judges', JSON.stringify(state.judges));
     },
 
+    // --- Пользователи справочника ---
     SET_USERS(state, users) {
       state.users = users;
     },
@@ -149,145 +149,149 @@ export default createStore({
     SET_ERROR(state, error) {
       state.error = error;
     },
+
+    // --- Результаты турнира и сетка ---
     SET_TOURNAMENT_RESULTS(state, results) {
       state.tournamentResults = results;
       localStorage.setItem('tournamentResults', JSON.stringify(results));
     },
     setBracketState(state, bracketState) {
-      // Создаем глубокую копию состояния перед сохранением
-      const stateToSave = JSON.parse(JSON.stringify(bracketState));
-      state.bracketState = stateToSave;
-      localStorage.setItem('bracketState', JSON.stringify(stateToSave));
+      state.bracketState = JSON.parse(JSON.stringify(bracketState));
+      localStorage.setItem('bracketState', JSON.stringify(state.bracketState));
     },
     clearSchedule(state) {
       state.schedule = [];
+      localStorage.removeItem('schedule');
     },
     clearTournamentResults(state) {
       state.tournamentResults = [];
-    }
+      localStorage.removeItem('tournamentResults');
+    },
   },
 
   actions: {
-    // Асинхронные действия с данными
+    // Импортирование пачки данных
     async importCompetitionData({ commit }, data) {
-      try {
-        if (data.competition) commit('setCompetition', data.competition);
-        if (data.teams) commit('setTeams', data.teams);
-        if (data.participants) commit('setParticipants', data.participants);
-        if (data.schedule) commit('setSchedule', data.schedule);
-        if (data.judges) commit('setJudges', data.judges);
-        return true;
-      } catch (error) {
-        console.error('Ошибка при импорте данных:', error);
-        return false;
-      }
+      if (data.competition) commit('setCompetition', data.competition);
+      if (data.teams)       commit('setTeams', data.teams);
+      if (data.participants)commit('setParticipants', data.participants);
+      if (data.schedule)    commit('setSchedule', data.schedule);
+      if (data.judges)      commit('setJudges', data.judges);
+      return true;
+    },
+     
+    // --- Загрузка и сохранение заявок и расписания ---
+    async loadApprovedApplications({ commit }, competitionId) {
+      // GET /applications?competition_id=…
+      const { data } = await getApprovedApplications(competitionId);
+      commit('setApplications', data);
     },
 
-    // Сохранение результатов
+     
+async loadScheduleFromServer({ commit }, competitionId) {
+      // GET /matches?competition_id=…
+      const { data } = await getMatchesByCompetition(competitionId);
+      commit('setSchedule', data);
+    },
+
+
+   async saveScheduleToServer({ state, commit }, competitionId) {
+      // Преобразуем фронтовые объекты в схему MatchCreate
+      const matches = state.schedule.map(m => ({
+        red_id:      m.red_id,    // убедитесь, что в schedule есть эти поля
+        blue_id:     m.blue_id,
+        competition_id: competitionId,
+        judge_id:    m.judge_id   || null,
+        referee_id:  m.referee_id || null,
+        match_time:  m.time ? new Date(m.time).toISOString() : null,
+        score:       m.points ?? null,
+        comment:     m.note   ?? null,
+        winner_id:   m.result
+                       ? (m.result === m.fighter1 ? m.red_user_id : m.blue_user_id)
+                       : null
+      }));
+
+      // POST /matches/batch
+      const { data } = await createMatchesBatch(matches);
+
+      // по желанию перезапишем state.schedule тем, что вернулось с бэка
+      commit('setSchedule', data);
+    }, // --- Сохранение результатов турнира в localStorage ---
     async saveResults({ state }) {
-      try {
-        const results = {
-          competition: state.competition,
-          schedule: state.schedule,
-          timestamp: new Date().toISOString()
-        };
-        localStorage.setItem('competitionResults', JSON.stringify(results));
-        return true;
-      } catch (error) {
-        console.error('Ошибка при сохранении результатов:', error);
-        return false;
-      }
+      const results = {
+        competition: state.competition,
+        schedule:    state.schedule,
+        timestamp:   new Date().toISOString()
+      };
+      localStorage.setItem('competitionResults', JSON.stringify(results));
+      return true;
     },
 
+    // --- CRUD для справочника пользователей ---
     async fetchUsers({ commit }) {
       commit('SET_LOADING', true);
       try {
         const users = await api.getUsers();
         commit('SET_USERS', users);
         commit('SET_ERROR', null);
-      } catch (error) {
-        commit('SET_ERROR', error.message);
+      } catch (e) {
+        commit('SET_ERROR', e.message);
       } finally {
         commit('SET_LOADING', false);
       }
     },
-    
     async createUser({ dispatch }, userData) {
-      try {
-        await api.createUser(userData);
-        await dispatch('fetchUsers');
-      } catch (error) {
-        throw error;
-      }
+      await api.createUser(userData);
+      await dispatch('fetchUsers');
     },
-    
     async updateUser({ dispatch }, { id, userData }) {
-      try {
-        await api.updateUser(id, userData);
-        await dispatch('fetchUsers');
-      } catch (error) {
-        throw error;
-      }
+      await api.updateUser(id, userData);
+      await dispatch('fetchUsers');
     },
-    
     async deleteUser({ dispatch }, id) {
-      try {
-        await api.deleteUser(id);
-        await dispatch('fetchUsers');
-      } catch (error) {
-        throw error;
-      }
+      await api.deleteUser(id);
+      await dispatch('fetchUsers');
     },
 
+    // --- Сохранение результатов внутри Vuex ---
     async saveTournamentResults({ commit, state }, results) {
-      try {
-        state.tournamentResults.push(results);
-        commit('SET_TOURNAMENT_RESULTS', state.tournamentResults);
-        return true;
-      } catch (error) {
-        console.error('Ошибка при сохранении результатов турнира:', error);
-        return false;
-      }
+      const arr = [...state.tournamentResults, results];
+      commit('SET_TOURNAMENT_RESULTS', arr);
+      return true;
     },
 
     clearAllData({ commit }) {
       commit('clearSchedule');
       commit('clearTournamentResults');
-    }
+    },
   },
 
   getters: {
     isAuthenticated: state => !!state.user,
     userRole: state => {
-  if (!state.user) return null;
-  if (state.user.role_id === 1) return 'organizer';
-  if (state.user.role_id === 2) return 'coach';
-  if (state.user.role_id === 3) return 'participant';
-  
-  return null;
-},
-    competition: state => state.competition,
-    teams: state => state.teams,
-    participants: state => state.participants,
-    schedule: state => state.schedule,
-    judges: state => state.judges,
-    
-    // Дополнительные геттеры для фильтрации и агрегации данных
-    participantsByTeam: state => team => {
-      return state.participants.filter(p => p.team === team);
+      if (!state.user) return null;
+      switch (state.user.role_id) {
+        case 1: return 'organizer';
+        case 2: return 'coach';
+        case 3: return 'participant';
+        default: return null;
+      }
     },
-    participantsByWeight: state => weight => {
-      return state.participants.filter(p => p.weight === weight);
-    },
-    matchesByStatus: state => status => {
-      return state.schedule.filter(m => m.status === status);
-    },
-    judgesByRole: state => role => {
-      return state.judges.filter(j => j.role === role);
-    },
-    getUsers: state => state.users,
-    isLoading: state => state.loading,
-    getError: state => state.error,
-    getTournamentResults: state => state.tournamentResults
+    competition:       state => state.competition,
+    teams:             state => state.teams,
+    participants:      state => state.participants,
+    schedule:          state => state.schedule,
+    judges:            state => state.judges,
+    applications:      state => state.applications,
+    users:             state => state.users,
+    isLoading:         state => state.loading,
+    getError:          state => state.error,
+    getTournamentResults: state => state.tournamentResults,
+
+    // Вспомогательные геттеры
+    participantsByTeam:   state => team   => state.participants.filter(p => p.team === team),
+    participantsByWeight: state => weight => state.participants.filter(p => p.weight === weight),
+    matchesByStatus:      state => status => state.schedule.filter(m => m.status === status),
+    judgesByRole:         state => role   => state.judges.filter(j => j.role === role),
   }
 });

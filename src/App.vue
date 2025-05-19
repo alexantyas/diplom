@@ -1,7 +1,8 @@
 <template>
   <div id="app">
-    <component :is="activeNavbar" />
-    <router-view :key="$route.fullPath"/>
+    <!-- Рендерим шапку только если activeNavbar не null -->
+    <component v-if="activeNavbar" :is="activeNavbar" />
+    <router-view :key="$route.fullPath" />
   </div>
 </template>
 
@@ -12,17 +13,13 @@ import NavbarGeneral from '@/components/NavbarGeneral.vue'
 import NavbarCompetition from '@/components/NavbarCompetition.vue'
 
 export default {
-  components: {
-    NavbarGeneral,
-    NavbarCompetition
-  },
   setup() {
     const route = useRoute()
 
     const activeNavbar = computed(() => {
       const path = route.path
 
-      // Без шапки: login + регистрации + личные кабинеты
+      // Без шапки для страниц логина, регистрации и личных кабинетов
       if (
         path === '/login' ||
         path.startsWith('/register') ||
@@ -34,13 +31,13 @@ export default {
         return null
       }
 
-      // Шапка для competition/:id/*
+      // Специальная шапка для маршрутов /competition/:id/*
       if (path.startsWith('/competition/')) {
-        return 'NavbarCompetition'
+        return NavbarCompetition
       }
 
-      // Общая шапка (для /dashboard и /create)
-      return 'NavbarGeneral'
+      // Общая шапка для всех остальных маршрутов
+      return NavbarGeneral
     })
 
     return { activeNavbar }
