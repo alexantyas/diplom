@@ -196,27 +196,25 @@ async loadScheduleFromServer({ commit }, competitionId) {
 
 
    async saveScheduleToServer({ state, commit }, competitionId) {
-      // Преобразуем фронтовые объекты в схему MatchCreate
-      const matches = state.schedule.map(m => ({
-        red_id:      m.red_id,    // убедитесь, что в schedule есть эти поля
-        blue_id:     m.blue_id,
-        competition_id: competitionId,
-        judge_id:    m.judge_id   || null,
-        referee_id:  m.referee_id || null,
-        match_time:  m.time ? new Date(m.time).toISOString() : null,
-        score:       m.points ?? null,
-        comment:     m.note   ?? null,
-        winner_id:   m.result
-                       ? (m.result === m.fighter1 ? m.red_user_id : m.blue_user_id)
-                       : null
-      }));
+  const matches = state.schedule.map(m => ({
+    red_id:      m.red_id ?? null,
+    blue_id:     m.blue_id ?? null,
+    competition_id: m.competition_id ?? state.competition?.id ?? null,
+    judge_id:    m.judge_id ?? null,
+    referee_id:  m.referee_id ?? null,
+    match_time:  m.time && m.time.length === 5
+                  ? new Date(`2025-05-19T${m.time}:00`).toISOString()
+                  : null,
+    score:       m.points ?? null,
+    comment:     m.note ?? null,
+    winner_id:   m.result === m.fighter1 ? m.red_user_id
+               : m.result === m.fighter2 ? m.blue_user_id
+               : null
+  }));
 
-      // POST /matches/batch
-      const { data } = await createMatchesBatch(matches);
-
-      // по желанию перезапишем state.schedule тем, что вернулось с бэка
-      commit('setSchedule', data);
-    }, // --- Сохранение результатов турнира в localStorage ---
+  const { data } = await createMatchesBatch(matches);
+  commit('setSchedule', data);
+}, // --- Сохранение результатов турнира в localStorage ---
     async saveResults({ state }) {
       const results = {
         competition: state.competition,

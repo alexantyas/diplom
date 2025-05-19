@@ -151,8 +151,12 @@ export default {
     onMounted(async () => {
       await store.dispatch('loadApprovedApplications', competitionId);
       await store.dispatch('loadScheduleFromServer', competitionId);
-      await store.dispatch('generateSchedule', competitionId);
       await store.dispatch('saveScheduleToServer', competitionId);
+      const existing = store.state.schedule;
+  if (!existing || existing.length === 0) {
+    await generateSchedule(); // только если пусто
+  }
+      
     });
 
     // Фильтрация
@@ -213,7 +217,7 @@ const generateSchedule = async () => {
   selectedCategory.value = '';
   selectedJudge.value    = '';
 
-  await store.dispatch('loadApprovedApplications', competitionId);
+  
   const apps = store.state.applications.filter(a => a.status === 'approved');
   console.log('approved apps:', apps);
 
@@ -226,10 +230,7 @@ const generateSchedule = async () => {
         weight: p.weight,
       }));
     }
-    if (
-      Array.isArray(app.individual_participants) &&
-      app.individual_participants.length > 0
-    ) {
+    if (Array.isArray(app.individual_participants) && app.individual_participants.length > 0) {
       const ip = app.individual_participants[0];
       return [{
         id:     ip.user_id,
@@ -240,7 +241,6 @@ const generateSchedule = async () => {
     }
     return [];
   });
-  console.log('flattened participants:', parts);
 
   const byWeight = {};
   parts.forEach(p => {
@@ -255,14 +255,7 @@ const generateSchedule = async () => {
 
     while (pool.length >= 2) {
       const fighter1 = pool.shift();
-
-      // Вот здесь изменили условие
-      const opponents = pool.filter(x =>
-        fighter1.team != null
-          ? x.team !== fighter1.team
-          : true
-      );
-
+      const opponents = pool.filter(x => fighter1.team != null ? x.team !== fighter1.team : true);
       if (opponents.length === 0) break;
 
       const fighter2 = opponents[Math.floor(Math.random() * opponents.length)];
@@ -275,11 +268,17 @@ const generateSchedule = async () => {
         competition_id: competitionId,
         category:       `${weight} кг`,
         fighter1:       fighter1.name,
+        red_id:     fighter1.isUser ? fighter1.id : null,
+        red_user_id:fighter1.isUser ? fighter1.id : null,
         fighter2:       fighter2.name,
+        blue_id:    fighter2.isUser ? fighter2.id : null,
+        blue_user_id:fighter2.isUser ? fighter2.id : null,
         stage:          '',
         time:           '',
-        judge:          randJ?.name   || '',
+        judge:          randJ?.name || '',
+        judge_id:       randJ?.id   || null,
         referee:        '',
+        referee_id:     null,
         tatami:         randJ?.tatami || '1',
         result:         '',
         note:           '',
@@ -292,13 +291,10 @@ const generateSchedule = async () => {
   console.log('newSched:', newSched);
 
   store.commit('setSchedule', newSched);
-  await store.dispatch('saveScheduleToServer', competitionId);
-
+  
   alert('Расписание сгенерировано и сохранено');
 };
-    onMounted(() => {
-      store.dispatch('loadScheduleFromServer', competitionId);
-    });
+    
 
 
 
