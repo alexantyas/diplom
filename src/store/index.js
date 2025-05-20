@@ -1,8 +1,13 @@
 // src/store/index.js
 import { createStore } from 'vuex';
 import api from '@/api';
-import { getApprovedApplications, createMatchesBatch } from '@/api';
-
+import { getApprovedApplications, createMatchesBatch,getMatchesByCompetition, } from '@/api';
+const SCHEDULE_KEY_BASE = 'schedule'
+function getScheduleKey(competitionId) {
+  return competitionId != null
+    ? `${SCHEDULE_KEY_BASE}_${competitionId}`
+    : SCHEDULE_KEY_BASE
+}
 export default createStore({
   state: {
     // Пользователь
@@ -15,7 +20,7 @@ export default createStore({
     judges:      JSON.parse(localStorage.getItem('judges'))      || [],
 
     // Расписание матчей
-    schedule:    JSON.parse(localStorage.getItem('schedule'))    || [],
+    schedule: [],
 
     // Заявки на участие (новое)
     applications: [],
@@ -63,6 +68,12 @@ export default createStore({
     setCompetition(state, competition) {
       state.competition = competition;
       localStorage.setItem('competition', JSON.stringify(competition));
+      if (prevId !== competition.id) {
+   state.schedule = [];
+    state.applications = [];
+    localStorage.removeItem(getScheduleKey(prevId))
+    localStorage.removeItem(`applications_${prevId}`)
+  }
     },
 
     // --- Команды ---
@@ -96,32 +107,21 @@ export default createStore({
       state.participants.splice(index, 1);
       localStorage.setItem('participants', JSON.stringify(state.participants));
     },
-    async loadSchedule({ commit }, competitionId) {
-      const { data } = await getMatchesByCompetition(competitionId);
-      commit('setSchedule', data);
-    },
+    
     // --- Расписание матчей ---
     setSchedule(state, schedule) {
-      state.schedule = schedule;
-      localStorage.setItem('schedule', JSON.stringify(schedule));
+      state.schedule = schedule
     },
     addMatch(state, match) {
-      state.schedule.push(match);
-      localStorage.setItem('schedule', JSON.stringify(state.schedule));
+      state.schedule.push(match)
     },
     updateMatch(state, { index, match }) {
       if (index >= 0 && index < state.schedule.length) {
-        // Мержим новое в старое
-        state.schedule[index] = { 
-          ...state.schedule[index], 
-          ...match 
-        };
-        localStorage.setItem('schedule', JSON.stringify(state.schedule));
+        state.schedule[index] = { ...state.schedule[index], ...match }
       }
     },
-    removeMatch(state, index) {
-      state.schedule.splice(index, 1);
-      localStorage.setItem('schedule', JSON.stringify(state.schedule));
+    removeMatch(state, idx) {
+      state.schedule.splice(idx, 1)
     },
 
     // --- Судьи ---
@@ -185,29 +185,78 @@ export default createStore({
 
     // --- Загрузка и сохранение заявок и расписания ---
     async loadApprovedApplications({ commit }, competitionId) {
+      if (!competitionId) throw new Error('Competition ID is missing');
       const { data } = await getApprovedApplications(competitionId);
       commit('setApplications', data);
+
+      // Собираем участников: индивидуальных и командных
+      let participants = [];
+      for (const app of data) {
+        // Индивидуальные
+        if (app.individual_participants) {
+          participants.push(
+            ...app.individual_participants.map(p => ({
+              id: p.user.id,
+              type: "individual",
+              name: `${p.user.last_name} ${p.user.first_name} ${p.user.middle_name || ""}`.trim()
+            }))
+          );
+        }
+        // Командные
+        if (app.team_participants) {
+          participants.push(
+            ...app.team_participants.map(p => ({
+              id: p.id,
+              type: "team",
+              name: `${p.last_name} ${p.first_name} ${p.middle_name || ""}`.trim()
+            }))
+          );
+        }
+      }
+      // Уникальность по id+type (на случай дублей)
+      participants = participants.filter(
+        (v, i, a) => a.findIndex(t => t.id === v.id && t.type === v.type) === i
+      );
+
+      commit('setParticipants', participants);
     },
-    async saveScheduleToServer({ state }, competitionId) {
-    if (!competitionId) throw new Error('Competition ID is missing');
 
-    // Предполагаем, что в state.schedule у каждого матча есть необходимые ID:
-    const matches = state.schedule
-  .filter(m => m.red_user_id && m.blue_user_id)
-  .map(m => ({
-    red_id:        m.red_user_id,
-    blue_id:       m.blue_user_id,
-    competition_id: m.competition_id,
-    judge_id:      m.judge_id || null,
-    referee_id:    m.referee_id || null,
-    match_time:    m.time ? new Date(m.time).toISOString() : null,
-    score:         m.points ?? null,
-    comment:       m.note   ?? null,
-  }));
 
-    // Отправляем правильный пакет
-    await createMatchesBatch(matches);
-  },
+    async loadSchedule({ commit }, competitionId) {
+      if (!competitionId) throw new Error('Competition ID is missing');
+      const { data } = await getMatchesByCompetition(competitionId);
+      commit('setSchedule', data);
+      localStorage.setItem(getScheduleKey(competitionId), JSON.stringify(data));
+    },
+
+
+    async saveSchedule({ state }, competitionId) {
+      if (!competitionId) throw new Error('Competition ID is missing');
+
+      const payload = state.schedule.map(m => ({
+        red_participant_type: m.fighter1?.type,
+        red_participant_id: m.fighter1?.id,
+        blue_participant_type: m.fighter2?.type,
+        blue_participant_id: m.fighter2?.id,
+        winner_participant_type: m.result?.type || null,
+        winner_participant_id: m.result?.id || null,
+        competition_id: competitionId,
+        referee_id: m.referee_id || null,
+        judge_id: m.judge_id || null,
+        match_time: m.time ? new Date(m.time).toISOString() : null,
+        score: m.points ?? null,
+        comment: m.note || null
+      }));
+      console.log('schedule:', state.schedule);
+      await createMatchesBatch(payload);
+      console.log("Отправляемый payload:", JSON.stringify(payload, null, 2));
+      // Локальный кеш
+      localStorage.setItem(
+        getScheduleKey(competitionId),
+        JSON.stringify(state.schedule)
+      );
+    },
+    
 
     // --- Сохранение результатов турнира в localStorage ---
     async saveResults({ state }) {
@@ -215,9 +264,9 @@ export default createStore({
         competition: state.competition,
         schedule:    state.schedule,
         timestamp:   new Date().toISOString()
-      };
-      localStorage.setItem('competitionResults', JSON.stringify(results));
-      return true;
+      }
+      localStorage.setItem('competitionResults', JSON.stringify(results))
+      return true
     },
 
     // --- CRUD для справочника пользователей ---

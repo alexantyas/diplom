@@ -58,8 +58,14 @@
                 <span v-else>-</span>
               </td>
               <td><span class="badge bg-secondary">{{ m.category }}</span></td>
-              <td><span :class="{ 'text-success fw-bold': m.result===m.fighter1 }">{{ m.fighter1 }}</span></td>
-              <td><span :class="{ 'text-success fw-bold': m.result===m.fighter2 }">{{ m.fighter2 }}</span></td>
+              <td>
+  <span v-if="m.fighter1">{{ m.fighter1.name }}</span>
+  <span v-else>-</span>
+</td>
+              <td>
+  <span v-if="m.fighter2">{{ m.fighter2.name }}</span>
+  <span v-else>-</span>
+</td>
               <td>
                 <input type="time" v-model="m.time" class="form-control form-control-sm"
                        @change="updateMatch(m)" />
@@ -81,13 +87,14 @@
               </td>
               <td>
                 <template v-if="!isBracketMatch(m) || !m.result">
-                  <select v-model="m.result" class="form-select form-select-sm" @change="updateMatch(m)">
-                    <option value="">Не завершен</option>
-                    <option :value="m.fighter1">{{ m.fighter1 }}</option>
-                    <option :value="m.fighter2">{{ m.fighter2 }}</option>
-                  </select>
+                  <select v-model="m.fighter1" class="form-select form-select-sm" @change="updateMatch(m)">
+  <option :value="null">–</option>
+  <option v-for="p in participants" :key="p.type+'-'+p.id" :value="p">
+    {{ p.name }} ({{ p.type === 'team' ? 'командный' : 'индивидуальный' }})
+  </option>
+</select>
                 </template>
-                <span v-else class="text-success">{{ m.result }}</span>
+                <span v-else class="text-success">{{ m.result?.name || m.result }}</span>
               </td>
               <td>
                 <template v-if="!isBracketMatch(m)">
@@ -125,19 +132,21 @@
 import { ref, computed, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import { useRoute } from 'vue-router';
-
+import { useBracketStore } from '@/store/bracketStore';
+import { getScheduleKey } from '@/utils/storageKeys'
 export default {
   setup() {
     const store = useStore();
     const route = useRoute();
     const competitionId = Number(route.params.id);
-
+    const { weightCategories, selectCategory, initializeBracket,loadState } = useBracketStore()
     const selectedCategory = ref('');
     const selectedJudge    = ref('');
 
     const applications = computed(() => store.state.applications);
     const schedule = computed(() => store.state.schedule || []);
     const judges       = computed(() => store.state.judges);
+    const participants = computed(() => store.state.participants);
 
     const approvedApps = computed(() =>
       store.state.applications.filter(a => a.status === 'approved')
@@ -147,10 +156,24 @@ export default {
       Array.from(new Set(schedule.value.map(m => m.category)))
     );
 
-    onMounted(() => {
-  store.dispatch('loadApprovedApplications', competitionId);
-  store.dispatch('loadSchedule', competitionId); // Добавьте эту строку!
-});
+    onMounted(async () => {
+  await store.dispatch('loadApprovedApplications', competitionId)
+
+  const lsKey = getScheduleKey(competitionId)
+   const saved = localStorage.getItem(lsKey)
+   if (saved) {
+     // есть локальный кеш — сразу в state
+     store.commit('setSchedule', JSON.parse(saved))
+   } else {
+     // кеша нет — грузим из API и сразу кешируем
+     await store.dispatch('loadSchedule', competitionId)
+   }
+   const hasSaved = loadState()
+    if (!hasSaved && weightCategories.value.length) {
+      selectCategory(weightCategories.value[0])
+      initializeBracket()
+    }
+  });
     // Фильтрация
     const filterMatches = arr => arr.filter(m =>
   (!selectedCategory.value || m.category === selectedCategory.value) &&
@@ -213,94 +236,81 @@ export default {
 
     // Генерация на основе approved-заявок
 const generateSchedule = async () => {
-  selectedCategory.value = '';
-  selectedJudge.value    = '';
+      selectedCategory.value = '';
+      selectedJudge.value = '';
 
-  await store.dispatch('loadApprovedApplications', competitionId);
-  await store.dispatch('loadSchedule', competitionId);
-  const apps = store.state.applications.filter(a => a.status === 'approved');
-  console.log('approved apps:', apps);
+      await store.dispatch('loadApprovedApplications', competitionId);
+      await store.dispatch('loadSchedule', competitionId);
+      const apps = store.state.applications.filter(a => a.status === 'approved');
 
-  const parts = apps.flatMap(app => {
-    if (app.request_type_id === 2 && Array.isArray(app.team_participants)) {
-      return app.team_participants.map(p => ({
-        id:     p.id,
-        name:   `${p.last_name} ${p.first_name}${p.middle_name ? ` ${p.middle_name}` : ''}`,
-        team:   app.team_id,
-        weight: p.weight,
-      }));
-    }
-    if (
-      Array.isArray(app.individual_participants) &&
-      app.individual_participants.length > 0
-    ) {
-      const ip = app.individual_participants[0];
-      return [{
-        id:     ip.user_id,
-        name:   `${ip.user.last_name} ${ip.user.first_name}${ip.user.middle_name ? ` ${ip.user.middle_name}` : ''}`,
-        team:   null,
-        weight: ip.user.weight,
-      }];
-    }
-    return [];
-  });
-  console.log('flattened participants:', parts);
-
-  const byWeight = {};
-  parts.forEach(p => {
-    ;(byWeight[p.weight] ||= []).push(p);
-  });
-
-  const newSched = [];
-  let num = 1;
-
-  Object.entries(byWeight).forEach(([weight, list]) => {
-    let pool = [...list];
-
-    while (pool.length >= 2) {
-      const fighter1 = pool.shift();
-
-      // Вот здесь изменили условие
-      const opponents = pool.filter(x =>
-        fighter1.team != null
-          ? x.team !== fighter1.team
-          : true
-      );
-
-      if (opponents.length === 0) break;
-
-      const fighter2 = opponents[Math.floor(Math.random() * opponents.length)];
-      pool = pool.filter(x => x !== fighter2);
-
-      const randJ = judges.value[Math.floor(Math.random() * judges.value.length)];
-
-      newSched.push({
-        id:             num++,
-        competition_id: competitionId,
-        category:       `${weight} кг`,
-        fighter1:       fighter1.name,
-        fighter2:       fighter2.name,
-        stage:          '',
-        time:           '',
-        judge:          randJ?.name   || '',
-        referee:        '',
-        tatami:         randJ?.tatami || '1',
-        result:         '',
-        note:           '',
-        points:         0,
-        status:         'upcoming',
+      const parts = [];
+      for (const app of apps) {
+        if (app.request_type_id === 2 && Array.isArray(app.team_participants)) {
+          parts.push(...app.team_participants.map(p => ({
+            id:     p.id,
+            type:   "team",
+            name:   `${p.last_name} ${p.first_name}${p.middle_name ? ` ${p.middle_name}` : ''}`,
+            team:   app.team_id,
+            weight: p.weight,
+          })));
+        }
+        if (
+          Array.isArray(app.individual_participants) &&
+          app.individual_participants.length > 0
+        ) {
+          const ip = app.individual_participants[0];
+          parts.push({
+            id:     ip.user.id,
+            type:   "individual",
+            name:   `${ip.user.last_name} ${ip.user.first_name}${ip.user.middle_name ? ` ${ip.user.middle_name}` : ''}`,
+            team:   null,
+            weight: ip.user.weight,
+          });
+        }
+      }
+      const byWeight = {};
+      parts.forEach(p => {
+        ;(byWeight[p.weight] ||= []).push(p);
       });
-    }
-  });
 
-  console.log('newSched:', newSched);
+      const newSched = [];
+      let num = 1;
 
-  store.commit('setSchedule', newSched);
-await store.dispatch('saveScheduleToServer', competitionId);
-// после удачного сохранения — подтягиваем из БД свеженькие:
-await store.dispatch('loadSchedule', competitionId);
-alert('Расписание сгенерировано, сохранено и загружено');
-};
+      Object.entries(byWeight).forEach(([weight, list]) => {
+        let pool = [...list];
+        while (pool.length >= 2) {
+          const fighter1 = pool.shift();
+          const opponents = pool.filter(x =>
+            fighter1.team != null
+              ? x.team !== fighter1.team
+              : true
+          );
+          if (opponents.length === 0) break;
+          const fighter2 = opponents[Math.floor(Math.random() * opponents.length)];
+          pool = pool.filter(x => x !== fighter2);
+          const randJ = judges.value[Math.floor(Math.random() * judges.value.length)];
+          newSched.push({
+            id:             num++,
+            competition_id: competitionId,
+            category:       `${weight} кг`,
+            fighter1:       fighter1,
+            fighter2:       fighter2,
+            stage:          '',
+            time:           '',
+            judge:          randJ?.name   || '',
+            referee:        '',
+            tatami:         randJ?.tatami || '1',
+            result:         null,
+            note:           '',
+            points:         0,
+            status:         'upcoming',
+          });
+        }
+      });
+      store.commit('setSchedule', newSched);
+      await store.dispatch('saveScheduleToServer', competitionId);
+      await store.dispatch('saveSchedule', competitionId);
+    };
 
 
     const addMatch = () => {
@@ -309,13 +319,13 @@ alert('Расписание сгенерировано, сохранено и з
         id: Date.now(),
         competition_id: competitionId,
         category: selectedCategory.value,
-        fighter1:'', fighter2:'',
-        stage:'', time:'', judge:'', referee:'', tatami:'', result:'', note:'', points:0, status:'upcoming'
+        fighter1: null, fighter2: null,
+        stage:'', time:'', judge:'', referee:'', tatami:'', result: null, note:'', points:0, status:'upcoming'
       });
     };
 
     const saveSchedule = async () => {
-      await store.dispatch('saveScheduleToServer', competitionId);
+      await store.dispatch('saveSchedule', competitionId);
       alert('Расписание сохранено');
     };
     const saveResults = async () => {
@@ -326,7 +336,7 @@ alert('Расписание сгенерировано, сохранено и з
     
 
     return {
-      judges, selectedCategory, selectedJudge,
+      judges, participants, selectedCategory, selectedJudge,
       uniqueCategories, sections,
       generateSchedule, addMatch, saveSchedule, saveResults,
       updateMatch, updateMatchStatus, isBracketMatch

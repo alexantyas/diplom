@@ -31,14 +31,18 @@ export async function getProfile() {
 
 // 📥 Получить заявки (одобренные)
 export function getApprovedApplications(competitionId) {
-  return api.get(
-    `/applications?competition_id=${competitionId}`
-  );
+  return api.get('/applications/', {
+    // ← обязательно в params, а не в body!
+    params: { competition_id: competitionId }
+  })
 }
 
 // 📤 Получить матчи по соревнованию
 export function getMatchesByCompetition(compId) {
-  return axios.get(`/matches/?competition_id=${compId}`);
+  // теперь идёт через api.create({ baseURL, headers })
+  return api.get(`/matches/`, {
+   params: { competition_id: compId }
+  });
 }
 
 // 📦 Пакетное создание матчей
