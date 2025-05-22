@@ -1,42 +1,45 @@
 <template>
-  <div class="container mt-4">
-    <h4 class="mb-4">Созданные соревнования</h4>
+  
+    <div class="container py-5">
+      <h2 class="text-center fw-bold mb-5" style="color: #333;">Созданные соревнования</h2>
 
-    <div v-if="competitions.length === 0" class="alert alert-info">
-      Пока не создано ни одного соревнования.
-    </div>
+      <div v-if="competitions.length === 0" class="alert alert-info text-center">
+        Пока не создано ни одного соревнования.
+      </div>
 
-    <div v-else class="row g-4">
-      <div class="col-12" v-for="comp in competitions" :key="comp.id">
-        <div
-          class="card shadow-sm p-4"
-          style="cursor: pointer;"
-          @click="openCompetition(comp.id)"
-        >
-          <div class="card-body">
+      <div v-else class="row g-4">
+        <div class="col-12" v-for="comp in competitions" :key="comp.id">
+          <div
+            class="card shadow-sm border-0 p-4"
+            style="border-radius: 12px; transition: box-shadow 0.2s;"
+            @click="openCompetition(comp.id)"
+            @mouseover="hover = true" @mouseleave="hover = false"
+          >
             <div class="d-flex justify-content-between align-items-start flex-wrap">
               <div>
-                <h5 class="card-title">{{ comp.name }}</h5>
-                <p class="mb-1">
-                  <strong>Организатор:</strong> {{ comp.organizer }}
-                </p>
-                <p class="mb-1">
-                  <strong>Город:</strong> {{ comp.venue.city_name }}
-                </p>
-                <p class="mb-1">
-                  <strong>Место:</strong> {{ comp.venue.name }}
-                </p>
-                <p class="mb-1">
-                  <strong>Дата:</strong> {{ formatDate(comp.start_date) }}
-                </p>
-                <p class="mb-3">
-                  <strong>Тип:</strong> {{ comp.type || '—' }}
-                </p>
-                <p class="mb-1">
-                  <strong>Заявок:</strong> {{ getApplicationCount(comp.id) }}
-                </p>
+                <h4 class="fw-bold mb-3">{{ comp.name }}</h4>
+                <p class="mb-0 text-muted">
+  <span><strong>Организация:</strong> {{ comp.organizer }}</span> •
+  <span><strong>Город:</strong> {{ comp.venue.city_name }}</span> •
+  <span><strong>Место:</strong> {{ comp.venue.name }}</span> •
+  <span><strong>Дата:</strong> {{ formatDate(comp.start_date) }}</span> •
+  <span><strong>Тип:</strong> {{ comp.type || '—' }}</span> •
+  <span><strong>Заявок:</strong> {{ getApplicationCount(comp.id) }}</span>
+</p>
+                <!-- Индикатор статуса -->
+                <span
+                  class="badge"
+                  :class="{
+                    'bg-success': comp.status === 'Открыта',
+                    'bg-warning text-dark': comp.status === 'Проводится',
+                    'bg-secondary': comp.status === 'Завершено'
+                  }"
+                >
+                  {{ comp.status }}
+                </span>
               </div>
 
+              <!-- Управление -->
               <div class="d-flex flex-column align-items-end ms-auto">
                 <select
                   v-model="comp.status"
@@ -51,7 +54,7 @@
                 </select>
 
                 <button
-                  class="btn btn-sm btn-outline-danger"
+                  class="btn btn-outline-danger btn-sm"
                   @click.stop="deleteCompetition(comp.id)"
                 >
                   Удалить
@@ -62,7 +65,7 @@
         </div>
       </div>
     </div>
-  </div>
+  
 </template>
 
 <script>

@@ -1,4 +1,5 @@
 <template>
+  <div style="background-color: #e0dcd5; min-height: 100vh;">
   <div class="container mt-3">
     <h3>⚖️ Судейская</h3>
 
@@ -40,45 +41,11 @@
     </div>
 
     <!-- ✅ Таблица расписания для судей -->
-    <table class="table table-striped">
-      <thead>
-        <tr>
-          <th>#</th>
-          <th>Весовая категория</th>
-          <th>Спортсмен 1</th>
-          <th>Спортсмен 2</th>
-          <th>Результат</th>
-          <th>Действия</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="(match, index) in schedule" :key="index">
-          <td>{{ index + 1 }}</td>
-          <td>{{ match.category }}</td>
-          <td>{{ match.fighter1 }}</td>
-          <td>{{ match.fighter2 }}</td>
-          <td>
-            <select v-model="match.result" class="form-select form-select-sm">
-              <option value="">Выберите победителя</option>
-              <option :value="match.fighter1">{{ match.fighter1 }}</option>
-              <option v-if="match.fighter2 !== 'Автоматическая победа'" :value="match.fighter2">{{ match.fighter2 }}</option>
-              <option value="draw">Ничья</option>
-            </select>
-          </td>
-          <td>
-            <button @click="saveResult(index, match)" class="btn btn-primary btn-sm">💾 Сохранить</button>
-          </td>
-        </tr>
-      </tbody>
-    </table>
+    
 
     <!-- ✅ Кнопка для сохранения всех результатов -->
-    <button @click="saveAllResults" class="btn btn-success">📥 Сохранить все результаты</button>
-
-    <!-- ✅ Уведомление об успешном сохранении -->
-    <div v-if="successMessage" class="alert alert-success mt-3">
-      {{ successMessage }}
-    </div>
+    
+  </div>
   </div>
 </template>
 

@@ -5,6 +5,9 @@
     font-style: normal;
   }
   
-  body {
-    font-family: "PT Sans", sans-serif;
-  }
+  body, html {
+  background-color: #e0dcd5;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}

@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div style="background-color: #e0dcd5; min-height: 100vh;">
     <!-- Шапка -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">

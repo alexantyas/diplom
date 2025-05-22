@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div style="background-color: #e0dcd5; min-height: 100vh;">
     <!-- Шапка -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
       <div class="container-fluid">
@@ -21,7 +21,6 @@
       </div>
     </nav>
 
-    <!-- Список соревнований -->
     <div class="container mt-4">
       <h4 class="mb-4">Предстоящие соревнования</h4>
       <div v-if="competitions.length === 0">Загрузка...</div>
@@ -30,7 +29,7 @@
       <div
         v-for="competition in openCompetitions"
         :key="competition.id"
-        class="card p-3 mb-3"
+        class="card p-3 mb-3 bg-white shadow-sm"
       >
         <div class="d-flex justify-content-between align-items-center">
           <div>
@@ -50,6 +49,7 @@
     </div>
   </div>
 </template>
+
 
 <script>
 import { ref, onMounted, computed } from 'vue';

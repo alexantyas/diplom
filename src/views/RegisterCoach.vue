@@ -1,4 +1,5 @@
 <template>
+  <div style="background-color: #e0dcd5; min-height: 100vh;">
   <div class="container d-flex justify-content-center align-items-center min-vh-100">
     <div class="col-md-5">
       <h2 class="text-center mb-4">Регистрация тренера</h2>
@@ -20,6 +21,7 @@
         <button class="btn btn-success w-100" @click="register">Зарегистрироваться</button>
       </div>
     </div>
+  </div>
   </div>
 </template>
 

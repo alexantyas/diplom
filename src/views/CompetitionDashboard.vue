@@ -1,6 +1,6 @@
 <template>
   
-  <div class="container mt-4">
+  <div class="container">
     <router-view />
   </div>
 </template>
@@ -12,3 +12,10 @@ export default {
   
 }
 </script>
+<style scoped>
+/* Перехватываем только эту .container в данном компоненте */
+.container {
+  max-width: none !important;  /* убираем ограничение из Bootstrap */
+  width: 100%     !important;
+  }
+</style>

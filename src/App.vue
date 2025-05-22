@@ -46,7 +46,16 @@ export default {
 </script>
 
 <style>
-body {
-  background-color: #f8f9fa;
+html, body {
+  background-color: #e0dcd5;
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+}
+
+#app {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
 }
 </style>

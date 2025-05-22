@@ -1,52 +1,96 @@
 <template>
-  <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="#">ARENA</a>
-      <div class="collapse navbar-collapse">
-        <ul class="navbar-nav me-auto">
-          <li class="nav-item">
-            <router-link to="/profile-participant" class="nav-link">Профиль</router-link>
-          </li>
-          <li class="nav-item">
-            <router-link to="/events" class="nav-link">Предстоящие соревнования</router-link>
-          </li>
-        </ul>
-        <button @click="logout" class="btn btn-danger">Выход</button>
-      </div>
-    </div>
-  </nav>
-  <div class="container mt-5">
-    <div class="row mb-4">
-      <div class="col-md-9">
-        <div class="card p-4 h-100">
-          <h4 class="mb-3">Профиль участника</h4>
-          <p><strong>ФИО:</strong> {{ user?.last_name || '' }} {{ user?.first_name || '' }} {{ user?.middle_name || '' }}</p>
-          <p><strong>Адрес:</strong> {{ cityName }}, {{ countryName }}</p>
-          <p><strong>Телефон:</strong> {{ user?.phone || '' }}</p>
-          <p><strong>Ник:</strong> {{ user?.login || '' }}</p>
-          <button class="btn btn-outline-success">Редактировать профиль</button>
+  <div style="background-color: #e0dcd5; min-height: 100vh;">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="#">ARENA</a>
+        <div class="collapse navbar-collapse">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item">
+              <router-link to="/profile-participant" class="nav-link">Профиль</router-link>
+            </li>
+            <li class="nav-item">
+              <router-link to="/events" class="nav-link">Предстоящие соревнования</router-link>
+            </li>
+          </ul>
+          <button @click="logout" class="btn btn-danger">Выход</button>
         </div>
       </div>
-      <div class="col-md-3 d-flex align-items-center">
-        <div class="card p-3 w-100 text-center">
-          <div class="mb-2 fw-bold">Фото</div>
-          <div class="rounded-circle bg-secondary mx-auto" style="width: 100px; height: 100px;"></div>
-        </div>
-      </div>
-    </div>
+    </nav>
 
-    <!-- Мои заявки -->
-    <div class="card p-4 mb-4">
-      <h5 class="mb-3">Мои заявки</h5>
-      <div v-if="myApplications.length === 0">Заявок пока нет.</div>
-      <ul class="list-group" v-else>
-        <li class="list-group-item" v-for="app in myApplications" :key="app.application.id">
-          Соревнование: {{ app.competition?.name || 'Без названия' }} — <strong>{{ app.status }}</strong>
-        </li>
-      </ul>
+    <div class="container mt-5">
+      <div class="row g-4">
+        <!-- Профиль -->
+        <div class="col-md-8">
+          <div class="card bg-white shadow-sm p-4">
+            <h4 class="mb-3" style="color: #333;">Профиль участника</h4>
+            <ul class="list-group list-group-flush">
+              <li class="list-group-item bg-transparent"><strong>ФИО:</strong> {{ user?.last_name }} {{ user?.first_name }} {{ user?.middle_name }}</li>
+              <li class="list-group-item bg-transparent"><strong>Адрес:</strong> {{ cityName }}, {{ countryName }}</li>
+              <li class="list-group-item bg-transparent"><strong>Телефон:</strong> {{ user?.phone }}</li>
+              <li class="list-group-item bg-transparent"><strong>Ник:</strong> {{ user?.login }}</li>
+            </ul>
+            <div class="mt-3">
+              <button class="btn btn-outline-success w-100">Редактировать профиль</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Фото -->
+        <div class="col-md-4">
+          <div class="card bg-white shadow-sm h-100 d-flex flex-column justify-content-center align-items-center p-4 text-center">
+            <h5 class="mb-3 " style="color: #333;" >Фотография</h5>
+
+            <div
+              v-if="preview"
+              class="rounded-circle border shadow-sm mb-3"
+              style="width: 150px; height: 150px; overflow: hidden;"
+            >
+              <img :src="preview" alt="Фото" class="w-100 h-100 object-fit-cover" />
+            </div>
+            <div
+              v-else
+              class="rounded-circle bg-light border d-flex align-items-center justify-content-center mb-3"
+              style="width: 150px; height: 150px;"
+            >
+              <i class="bi bi-person-fill fs-1 text-muted"></i>
+            </div>
+
+            <label class="btn btn-outline-primary btn-sm w-100">
+              Добавить фотографию
+              <input type="file" accept="image/*" hidden @change="handlePhotoUpload" />
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- Мои заявки -->
+      <div class="card bg-white mt-5 shadow-sm p-4">
+  <h5 class="mb-3" style="color: #333;">Мои заявки</h5>
+  <div v-if="myApplications.length === 0" class="text-muted">Заявок пока нет.</div>
+  <ul class="list-group" v-else>
+    <li
+      v-for="app in myApplications"
+      :key="app.application.id"
+      class="list-group-item d-flex justify-content-between align-items-center"
+    >
+      Соревнование: {{ app.competition?.name || 'Без названия' }}
+      <span
+        class="badge rounded-pill"
+        :class="{
+          'bg-success': app.status.toLowerCase() === 'подано',
+          'bg-danger': app.status.toLowerCase() === 'отклонено'
+        }"
+        :style="app.status.toLowerCase() === 'на рассмотрении' ? 'background-color: #cce5ff; color: #004085;' : ''"
+      >
+        {{ app.status }}
+      </span>
+    </li>
+  </ul>
+</div>
     </div>
   </div>
 </template>
+
 
 <script>
 import api from '@/api';
@@ -100,13 +144,22 @@ export default {
       store.commit('logout');
       router.push('/login');
     };
+    const preview = ref(null);
 
+      const handlePhotoUpload = (event) => {
+      const file = event.target.files[0];
+        if (file) {
+        preview.value = URL.createObjectURL(file);
+        }
+      };
     return {
+      handlePhotoUpload,
       user,
       myApplications,
       cityName,
       countryName,
       logout,
+      preview
     };
   }
 };

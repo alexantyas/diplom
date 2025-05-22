@@ -1,6 +1,6 @@
 <template>
   <div>
-    <!-- 1. Подробности соревнования -->
+    <!-- 1. Подробности соревнования (оставляем обычный container) -->
     <div class="container mt-4">
       <div v-if="competition" class="card p-4 mb-4 shadow-sm">
         <h5 class="card-title mb-3">{{ competition.name }}</h5>
@@ -9,7 +9,9 @@
           <template v-if="competition.user">
             {{ competition.user.last_name }}
             {{ competition.user.first_name }}
-            <span v-if="competition.user.middle_name">{{ competition.user.middle_name }}</span>
+            <span v-if="competition.user.middle_name">
+              {{ competition.user.middle_name }}
+            </span>
           </template>
           <template v-else>—</template>
         </p>
@@ -31,7 +33,7 @@
       </div>
     </div>
 
-    <!-- 2. Список заявок -->
+    <!-- 2. Список заявок (тоже в обычном container) -->
     <div v-if="competition" class="container">
       <h5 class="mb-3">Заявки на участие</h5>
       <div v-if="applications.length" class="row g-3">
@@ -47,52 +49,74 @@
                   {{ formatName(app.user) }}
                 </template>
                 <template v-else>
-                  {{ app.participantUser ? formatName(app.participantUser) : '—' }}
+                  {{ app.participantUser
+                    ? formatName(app.participantUser)
+                    : '—' }}
                 </template>
               </p>
               <p>
                 <strong>Тип заявки:</strong>
-                {{ app.request_type_id === 2 ? 'Командная' : 'Индивидуальная' }}
+                {{ app.request_type_id === 2
+                  ? 'Командная'
+                  : 'Индивидуальная' }}
               </p>
               <p>
                 <strong>Статус заявки:</strong>
                 <span
                   :class="{
-                    'badge bg-secondary':  app.status === 'pending' && !app.isUpdating,
-                    'badge bg-success':    app.status === 'approved' && !app.isUpdating,
-                    'badge bg-danger':     app.status === 'rejected' && !app.isUpdating,
+                    'badge bg-secondary':
+                      app.status === 'pending' &&
+                      !app.isUpdating,
+                    'badge bg-success':
+                      app.status === 'approved' &&
+                      !app.isUpdating,
+                    'badge bg-danger':
+                      app.status === 'rejected' &&
+                      !app.isUpdating,
                     'badge bg-warning text-dark': app.isUpdating
                   }"
                 >
                   <template v-if="app.isUpdating">
-                    <span class="spinner-border spinner-border-sm me-1"></span>
+                    <span
+                      class="spinner-border spinner-border-sm me-1"
+                    ></span>
                     {{ statusMap[app.pendingStatus] }}…
                   </template>
-                  <template v-else>{{ statusMap[app.status] }}</template>
+                  <template v-else>
+                    {{ statusMap[app.status] }}
+                  </template>
                 </span>
               </p>
             </div>
 
-            <!-- кнопки управления -->
+            <!-- кнопки -->
             <div class="d-flex justify-content-between mt-2">
               <button
                 class="btn btn-sm btn-outline-success"
-                :disabled="app.status === 'approved' || app.isUpdating"
+                :disabled="
+                  app.status === 'approved' || app.isUpdating
+                "
                 @click="changeStatus(app, 'approved')"
               >
                 <span
-                  v-if="app.isUpdating && app.pendingStatus==='approved'"
+                  v-if="
+                    app.isUpdating && app.pendingStatus === 'approved'
+                  "
                   class="spinner-border spinner-border-sm me-1"
                 ></span>
                 Утвердить
               </button>
               <button
                 class="btn btn-sm btn-outline-danger"
-                :disabled="app.status === 'rejected' || app.isUpdating"
+                :disabled="
+                  app.status === 'rejected' || app.isUpdating
+                "
                 @click="changeStatus(app, 'rejected')"
               >
                 <span
-                  v-if="app.isUpdating && app.pendingStatus==='rejected'"
+                  v-if="
+                    app.isUpdating && app.pendingStatus === 'rejected'
+                  "
                   class="spinner-border spinner-border-sm me-1"
                 ></span>
                 Отклонить
@@ -104,8 +128,8 @@
       <div v-else class="alert alert-warning">Нет заявок.</div>
     </div>
 
-    <!-- 3. Дочерние роуты (сетка, расписание...) -->
-    <div class="container-fluid mt-4">
+    <!-- 3. Тут держим только router-view в флюиде, без лишних стилей -->
+    <div class="mt-4">
       <router-view />
     </div>
 
@@ -168,6 +192,7 @@
     </div>
   </div>
 </template>
+
 
 <script>
 import { ref, onMounted } from "vue";

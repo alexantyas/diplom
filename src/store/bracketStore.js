@@ -1,16 +1,10 @@
 import { ref, computed, watch } from 'vue'
 import { useStore } from 'vuex'
 
-const STORAGE_KEY_BASE = 'tournament_brackets'
-function getStorageKey(competitionId) {
-  return competitionId
-    ? `${STORAGE_KEY_BASE}_${competitionId}`
-    : STORAGE_KEY_BASE
-}
+const STORAGE_KEY = 'tournament_brackets'
 
 export function useBracketStore() {
   const store = useStore()
-  const competitionId = computed(() => store.state.competition?.id)
   const selectedCategory = ref('')
   const loading = ref(false)
   const error = ref(null)
@@ -43,61 +37,49 @@ export function useBracketStore() {
 
   // Загрузка состояния из localStorage
   const loadState = () => {
-  try {
-    // 1. Достаём правильный ключ
-    const key = getStorageKey(competitionId.value)
-    const savedState = localStorage.getItem(key)
-    if (!savedState) return false
-
-    const allBrackets = JSON.parse(savedState)
-    // 2. Список сохранённых категорий для этого соревнования
-    const savedCategories = Object.keys(allBrackets)
-    if (savedCategories.length === 0) return false
-
-    // 3. Восстанавливаем выбранную категорию:
-    //    – если она ещё не установлена или некорректна, берём первую из savedCategories
-    if (!selectedCategory.value || !allBrackets[selectedCategory.value]) {
-      selectedCategory.value = savedCategories[0]
+    try {
+      const savedState = localStorage.getItem(STORAGE_KEY)
+      if (savedState) {
+        const allBrackets = JSON.parse(savedState)
+        
+        if (selectedCategory.value && allBrackets[selectedCategory.value]) {
+          const state = allBrackets[selectedCategory.value]
+          top32Matches.value = state.top32Matches || []
+          top16Matches.value = state.top16Matches || []
+          top8Matches.value = state.top8Matches || []
+          top4Matches.value = state.top4Matches || []
+          finalMatch.value = state.finalMatch || {
+            participant1: null,
+            participant2: null,
+            participant1Score: 0,
+            participant2Score: 0,
+            winner: null,
+            winnerScore: null
+          }
+          thirdPlaceMatch.value = state.thirdPlaceMatch || {
+            participant1: null,
+            participant2: null,
+            participant1Score: 0,
+            participant2Score: 0,
+            winner: null,
+            winnerScore: null
+          }
+          return true // Состояние загружено
+        }
+      }
+      return false // Состояние не найдено
+    } catch (err) {
+      console.error('Ошибка при загрузке состояния:', err)
+      return false
     }
-
-    // 4. Само состояние для этой категории
-    const state = allBrackets[selectedCategory.value]
-
-    top32Matches.value    = state.top32Matches    || []
-    top16Matches.value    = state.top16Matches    || []
-    top8Matches.value     = state.top8Matches     || []
-    top4Matches.value     = state.top4Matches     || []
-    finalMatch.value      = state.finalMatch      || {
-      participant1: null,
-      participant2: null,
-      participant1Score: 0,
-      participant2Score: 0,
-      winner: null,
-      winnerScore: null
-    }
-    thirdPlaceMatch.value = state.thirdPlaceMatch || {
-      participant1: null,
-      participant2: null,
-      participant1Score: 0,
-      participant2Score: 0,
-      winner: null,
-      winnerScore: null
-    }
-
-    return true
-  } catch (err) {
-    console.error('Ошибка при загрузке состояния:', err)
-    return false
   }
-}
 
   // Сохранение состояния в localStorage
   const saveState = () => {
     try {
       if (!selectedCategory.value) return
 
-      const key = getStorageKey(competitionId.value)
-      const savedState = localStorage.getItem(key)
+      const savedState = localStorage.getItem(STORAGE_KEY)
       const allBrackets = savedState ? JSON.parse(savedState) : {}
 
       allBrackets[selectedCategory.value] = {
@@ -109,15 +91,12 @@ export function useBracketStore() {
         thirdPlaceMatch: thirdPlaceMatch.value
       }
 
-      localStorage.setItem(key, JSON.stringify(allBrackets))
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(allBrackets))
     } catch (err) {
       console.error('Ошибка при сохранении состояния:', err)
     }
   }
-  watch(competitionId, () => {
-    selectedCategory.value = ''
-    loadState()
-  })
+
   // Наблюдение за изменениями состояния
   watch(
     [selectedCategory, top32Matches, top16Matches, top8Matches, top4Matches, finalMatch, thirdPlaceMatch],
@@ -715,7 +694,6 @@ export function useBracketStore() {
     initializeBracket,
     setWinner,
     selectCategory,
-    clearAllData,
-    loadState,
+    clearAllData
   }
 } 

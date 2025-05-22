@@ -1,4 +1,5 @@
 <template>
+  <div style="background-color: #e0dcd5; min-height: 100vh;">
   <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
     <div class="container-fluid">
       <a class="navbar-brand" href="#">ARENA</a>
@@ -40,6 +41,7 @@
         </tr>
       </tbody>
     </table>
+  </div>
   </div>
 </template>
 

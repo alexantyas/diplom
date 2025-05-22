@@ -1,4 +1,5 @@
 <template>
+  <div style="background-color: #e0dcd5; min-height: 100vh;">
   <div class="container mt-4">
     <h2>📑 Экспорт отчетов (Excel)</h2>
 
@@ -8,6 +9,7 @@
       <button @click="exportJudges" class="btn btn-success">📥 Список судей</button>
       <button @click="exportFullReport" class="btn btn-danger">📥 Полный отчет</button>
     </div>
+  </div>
   </div>
 </template>
 

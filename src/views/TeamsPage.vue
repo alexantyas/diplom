@@ -1,4 +1,5 @@
 <template>
+  <div style="background-color: #e0dcd5; min-height: 100vh;">
     <div class="container">
       <h2 class="text-center mt-3">Список команд</h2>
       <div class="card p-3 shadow-sm">
@@ -18,6 +19,7 @@
       </div>
   
     </div>
+  </div>
   </template>
   
   <script>

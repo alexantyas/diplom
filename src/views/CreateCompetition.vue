@@ -1,13 +1,11 @@
 <template>
-  <div>
-    <!-- Навигационная шапка -->
-
-    <!-- Основной контент -->
-    <div class="container mt-4">
+  
+    <div class="container mt-3">
       <div class="row">
         <div class="col-md-6">
-          <h2 class="mb-4">Создание соревнования</h2>
+          
           <div class="card p-4 shadow-sm">
+            <h2 class="mb-4">Создание соревнования</h2>
             <h4 class="mb-3">Основная информация</h4>
             <div class="mb-3">
               <label class="form-label">Название</label>
@@ -43,8 +41,9 @@
         </div>
 
         <div class="col-md-6">
-          <h2 class="mb-4">Импорт соревнования</h2>
+          
           <div class="card p-3 shadow-sm">
+            <h2 class="mb-4">Импорт соревнования</h2>
             <h6>Импорт из Excel</h6>
             <input type="file" @change="importCompetition" accept=".xlsx, .xls" class="form-control form-control-sm mb-2">
             <button @click="downloadTemplate" class="btn btn-outline-primary btn-sm w-100">📥 Скачать шаблон Excel</button>
@@ -62,7 +61,7 @@
         </div>
       </div>
     </div>
-  </div>
+  
 </template>
 
 <script>

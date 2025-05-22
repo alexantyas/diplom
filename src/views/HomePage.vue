@@ -1,4 +1,5 @@
 <template>
+  
   <div class="container text-center mt-5">
     <div v-if="user">
       <div class="alert alert-success" role="alert">

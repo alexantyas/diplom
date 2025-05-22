@@ -1,8 +1,10 @@
 <template>
+  <div style="background-color: #e0dcd5; min-height: 100vh;">
   <div class="container d-flex justify-content-center align-items-center min-vh-100">
     <div class="col-md-4">
-      <h2 class="text-center mb-4">Вход</h2>
+      
       <div class="card p-4 shadow-sm">
+        <h2 class="text-center mb-4">Вход</h2>
         <div class="mb-3">
           <label class="form-label">Логин</label>
           <input v-model="username" type="text" class="form-control" placeholder="Введите логин">
@@ -25,6 +27,7 @@
         </p>
       </div>
     </div>
+  </div>
   </div>
 </template>
 
