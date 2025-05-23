@@ -1,11 +1,16 @@
 <template>
   <div style="background-color: #e0dcd5; min-height: 100vh;">
     <div class="bracket-page">
-      <category-selector
-        :categories="weightCategories"
-        :selected-category="selectedCategory"
-        @select="selectCategory"
-      />
+      <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+        <span class="fw-bold">Выберите весовую категорию:</span>
+        <button
+          v-for="cat in weightCategories"
+          :key="cat"
+          class="btn"
+          :class="selectedCategory === cat ? 'btn-primary' : 'btn-outline-primary'"
+          @click="selectCategory(cat)"
+        >{{ cat }}</button>
+      </div>
 
       <div v-if="loading" class="text-center my-4">
         <div class="spinner-border" role="status">
@@ -21,59 +26,38 @@
         <h4>Выберите весовую категорию для отображения сетки</h4>
       </div>
 
-      <div v-else class="bracket-container">
-        <div class="main-bracket">
-          <bracket-round
-            v-if="top32Matches.length"
-            title="1/16 финала"
-            :matches="top32Matches"
-            :stage="32"
-            @winner-selected="setWinner"
-          />
-
-          <bracket-round
-            v-if="top16Matches.length"
-            title="1/8 финала"
-            :matches="top16Matches"
-            :stage="16"
-            @winner-selected="setWinner"
-          />
-
-          <bracket-round
-            v-if="top8Matches.length"
-            title="1/4 финала"
-            :matches="top8Matches"
-            :stage="8"
-            @winner-selected="setWinner"
-          />
-
-          <bracket-round
-            v-if="top4Matches.length"
-            title="1/2 финала"
-            :matches="top4Matches"
-            :stage="4"
-            @winner-selected="setWinner"
-          />
-
-          <bracket-round
-            v-if="finalMatch && finalMatch.participant1 && finalMatch.participant2"
-            title="ФИНАЛ"
-            :matches="[finalMatch]"
-            :stage="2"
-            :is-final="true"
-            @winner-selected="setWinner"
-          />
-        </div>
-
-        <div v-if="thirdPlaceMatch && thirdPlaceMatch.participant1 && thirdPlaceMatch.participant2" class="third-place-match">
-          <bracket-round
-            title="Матч за 3-е место"
-            :matches="[thirdPlaceMatch]"
-            :stage="3"
-            @winner-selected="setWinner"
-          />
+     <div v-else class="bracket-grid">
+    <div class="bracket-stage" v-for="(round, idx) in bracketRounds" :key="idx">
+      <div class="stage-title">{{ round.title }}</div>
+      <div class="matches">
+        <div
+          v-for="(match, mi) in round.matches"
+          :key="mi"
+          class="match-card"
+          :class="{ finished: match.winner }"
+        >
+          <div class="fighter" :class="{ winner: match.winner === getFighterName(match.participant1) }">
+  {{ getFighterName(match.participant1) }}
+  <button
+    v-if="!match.winner && match.participant1"
+    class="btn btn-sm btn-outline-success"
+    @click="setWinner({ match, winner: match.participant1, score: 0, stage: round.stage, matchIndex: mi })"
+    title="Отметить победителя"
+  >🏆</button>
+</div>
+<div class="fighter" :class="{ winner: match.winner === getFighterName(match.participant2) }">
+  {{ getFighterName(match.participant2) }}
+  <button
+    v-if="!match.winner && match.participant2"
+    class="btn btn-sm btn-outline-success"
+    @click="setWinner({ match, winner: match.participant2, score: 0, stage: round.stage, matchIndex: mi })"
+    title="Отметить победителя"
+  >🏆</button>
+</div>
         </div>
       </div>
+    </div>
+  </div>
     </div>
   </div>
 </template>
@@ -81,77 +65,152 @@
 <script>
 import { computed } from 'vue'
 import { useBracketStore } from '@/store/bracketStore'
-import CategorySelector from '@/components/bracket/CategorySelector.vue'
-import BracketRound from '@/components/bracket/BracketRound.vue'
 
 export default {
-  name: 'BracketPage',
-  components: {
-    CategorySelector,
-    BracketRound
-  },
   setup() {
     const {
       selectedCategory,
       loading,
       error,
       weightCategories,
-      top32Matches,
       top16Matches,
       top8Matches,
       top4Matches,
       finalMatch,
-      thirdPlaceMatch,
       setWinner,
-      selectCategory
+      selectCategory,
     } = useBracketStore()
+
+    const bracketRounds = computed(() => {
+      const rounds = [];
+      if (Array.isArray(top16Matches.value) && top16Matches.value.length > 0) {
+        rounds.push({ title: '1/8 финала', matches: top16Matches.value, stage: 16 });
+      }
+      if (Array.isArray(top8Matches.value) && top8Matches.value.length > 0) {
+        rounds.push({ title: '1/4 финала', matches: top8Matches.value, stage: 8 });
+      }
+      if (Array.isArray(top4Matches.value) && top4Matches.value.length > 0) {
+        rounds.push({ title: '1/2 финала', matches: top4Matches.value, stage: 4 });
+      }
+      if (
+        finalMatch.value &&
+        typeof finalMatch.value === 'object' &&
+        (finalMatch.value.participant1 || finalMatch.value.participant2)
+      ) {
+        rounds.push({ title: 'Финал', matches: [finalMatch.value], stage: 2 });
+      }
+      return rounds;
+    });
+
+  function getFighterName(f) {
+  if (!f) return '—'
+  if (typeof f === 'string') return f
+  if (typeof f === 'object' && f.name) return getFighterName(f.name)
+  return ''
+}
 
     return {
       selectedCategory,
       loading,
       error,
       weightCategories,
-      top32Matches,
-      top16Matches,
-      top8Matches,
-      top4Matches,
-      finalMatch,
-      thirdPlaceMatch,
+      bracketRounds,
       setWinner,
-      selectCategory
+      selectCategory,
+      getFighterName
     }
   }
 }
 </script>
 
+
 <style scoped>
-.bracket-page {
-  padding: 20px;
+.bracket-grid {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(160px, 1fr);
+  gap: 18px;
+  align-items: start;
+  max-width: 100vw;
+  overflow-x: auto;
+  min-height: 70vh;
 }
 
-.bracket-container {
+.bracket-stage {
+  width: 100%;
+}
+
+.stage-title {
+  font-weight: bold;
+  text-align: center;
+  margin-bottom: 4px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 4px 0;
+  font-size: 1rem;
+}
+
+.matches {
   display: flex;
   flex-direction: column;
-  gap: 30px;
-  padding: 20px 0;
+  gap: 12px;
 }
 
-.main-bracket {
+.match-card {
+  background: #fff;
+  border-radius: 10px;
+  box-shadow: 0 2px 10px #0001;
+  padding: 7px 4px; /* было 12px 8px */
+  min-height: 48px;  /* было 80px */
   display: flex;
-  gap: 30px;
-  overflow-x: auto;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  transition: box-shadow 0.2s;
+  font-size: 0.95rem;
+}
+.match-card.finished {
+  box-shadow: 0 2px 10px #42b98344;
+}
+.fighter {
+  padding: 4px 2px;
+  border-radius: 6px;
+  font-size: 0.95rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  transition: background 0.2s;
+}
+.fighter.winner {
+  background: #e9ffe7;
+  font-weight: bold;
+  color: #237030;
+  font-size: 1.07em;
+}
+.btn-outline-success {
+  margin-left: 8px;
+  font-size: 0.9em;
+  padding: 2px 8px;
+  height: 22px;
+  min-width: 25px;
 }
 
-.third-place-match {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 2px solid #eee;
-}
-
-@media (max-width: 768px) {
-  .main-bracket {
-    flex-direction: column;
-    gap: 20px;
+/* Для малых экранов: */
+@media (max-width: 900px) {
+  .bracket-grid {
+    gap: 6px;
+  }
+  .bracket-stage {
+    min-width: 100px;
+    max-width: 110px;
+  }
+  .match-card {
+    padding: 4px 2px;
+    min-height: 30px;
+    font-size: 0.85rem;
+  }
+  .fighter {
+    font-size: 0.85rem;
   }
 }
 </style>

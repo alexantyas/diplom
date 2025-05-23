@@ -100,38 +100,62 @@ export default createStore({
     },
 
     // --- Таблица расписания: изменения только локально (старый стиль) ---
-    setSchedule(state, schedule) {
-      state.schedule = schedule;
-      localStorage.setItem('schedule', JSON.stringify(schedule));
-    },
+    
     addMatch(state, match) {
-      state.schedule.push(match);
-      localStorage.setItem('schedule', JSON.stringify(state.schedule));
-    },
-    updateMatch(state, { index, match }) {
-      if (index >= 0 && index < state.schedule.length) {
-        let newStage = match.stage;
-    if (match.status === 'finished' && !match.stage) {
-      newStage = 'Обычный этап'; // Можешь подставлять, что хочешь, или определять по номеру матча
+  // ПРИМЕР: если пришла строка — делаем объект
+  if (match.fighter1 && typeof match.fighter1 === 'string') {
+    match.fighter1 = { name: match.fighter1 }
+  }
+  if (match.fighter2 && typeof match.fighter2 === 'string') {
+    match.fighter2 = { name: match.fighter2 }
+  }
+  state.schedule.push(match);
+  localStorage.setItem('schedule', JSON.stringify(state.schedule));
+},
+setSchedule(state, schedule) {
+  // Для каждой пары делаем то же самое
+  for (const match of schedule) {
+    if (match.fighter1 && typeof match.fighter1 === 'string') {
+      match.fighter1 = { name: match.fighter1 }
     }
-        // Мягкое слияние, как раньше
-        const updatedMatch = {
-          ...state.schedule[index],
-          ...match,
-          category: match.category || state.schedule[index].category,
-          fighter1: match.fighter1 || state.schedule[index].fighter1,
-          fighter2: match.fighter2 || state.schedule[index].fighter2,
-          stage: match.stage || state.schedule[index].stage,
-          status: match.status || state.schedule[index].status,
-          result: match.result || state.schedule[index].result,
-          points: match.points || state.schedule[index].points,
-          points1: match.points1 || state.schedule[index].points1,
-          points2: match.points2 || state.schedule[index].points2
-        }
-        state.schedule[index] = updatedMatch;
-      }
-      localStorage.setItem('schedule', JSON.stringify(state.schedule));
-    },
+    if (match.fighter2 && typeof match.fighter2 === 'string') {
+      match.fighter2 = { name: match.fighter2 }
+    }
+  }
+  state.schedule = schedule;
+  localStorage.setItem('schedule', JSON.stringify(schedule));
+},
+    updateMatch(state, { index, match }) {
+  if (index >= 0 && index < state.schedule.length) {
+    // Защита от строк — всегда объект
+    if (match.fighter1 && typeof match.fighter1 === 'string') {
+      match.fighter1 = { name: match.fighter1 }
+    }
+    if (match.fighter2 && typeof match.fighter2 === 'string') {
+      match.fighter2 = { name: match.fighter2 }
+    }
+    let newStage = match.stage;
+    if (match.status === 'finished' && !match.stage) {
+      newStage = 'Обычный этап';
+    }
+    const updatedMatch = {
+      ...state.schedule[index],
+      ...match,
+      category: match.category || state.schedule[index].category,
+      fighter1: match.fighter1 || state.schedule[index].fighter1,
+      fighter2: match.fighter2 || state.schedule[index].fighter2,
+      stage: match.stage || state.schedule[index].stage,
+      status: match.status || state.schedule[index].status,
+      result: match.result || state.schedule[index].result,
+      points: match.points || state.schedule[index].points,
+      points1: match.points1 || state.schedule[index].points1,
+      points2: match.points2 || state.schedule[index].points2
+    }
+    state.schedule[index] = updatedMatch;
+  }
+  localStorage.setItem('schedule', JSON.stringify(state.schedule));
+},
+
     removeMatch(state, index) {
       state.schedule.splice(index, 1);
       localStorage.setItem('schedule', JSON.stringify(state.schedule));
