@@ -380,11 +380,15 @@ export function useBracketStore() {
       match.status = 'finished'
 
       // Находим и обновляем этот матч в расписании, если он там есть
-      const scheduleMatches = store.state.schedule.filter(m => 
-        m.fighter1 === match.participant1?.name && 
-        m.fighter2 === match.participant2?.name && 
-        m.category === match.category
-      )
+      const scheduleMatches = store.state.schedule.filter(m =>
+  (
+    getPureName(m.fighter1) === getPureName(match.participant1?.name) &&
+    getPureName(m.fighter2) === getPureName(match.participant2?.name) ||
+    getPureName(m.fighter2) === getPureName(match.participant1?.name) &&
+    getPureName(m.fighter1) === getPureName(match.participant2?.name)
+  ) &&
+  m.category === match.category
+)
 
       if (scheduleMatches.length > 0) {
         const scheduleMatchIndex = store.state.schedule.indexOf(scheduleMatches[0])

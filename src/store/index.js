@@ -101,8 +101,11 @@ export default createStore({
 
     // --- Таблица расписания: изменения только локально (старый стиль) ---
     
-    addMatch(state, match) {
-  // ПРИМЕР: если пришла строка — делаем объект
+ addMatch(state, match) {
+  // Всегда храним result как строку (имя победителя)
+  if (match.result && typeof match.result === 'object' && match.result.name) {
+    match.result = match.result.name
+  }
   if (match.fighter1 && typeof match.fighter1 === 'string') {
     match.fighter1 = { name: match.fighter1 }
   }
@@ -113,7 +116,6 @@ export default createStore({
   localStorage.setItem('schedule', JSON.stringify(state.schedule));
 },
 setSchedule(state, schedule) {
-  // Для каждой пары делаем то же самое
   for (const match of schedule) {
     if (match.fighter1 && typeof match.fighter1 === 'string') {
       match.fighter1 = { name: match.fighter1 }
@@ -121,18 +123,24 @@ setSchedule(state, schedule) {
     if (match.fighter2 && typeof match.fighter2 === 'string') {
       match.fighter2 = { name: match.fighter2 }
     }
+    // Исправить поле result если оно объект
+    if (match.result && typeof match.result === 'object' && match.result.name) {
+      match.result = match.result.name
+    }
   }
   state.schedule = schedule;
   localStorage.setItem('schedule', JSON.stringify(schedule));
 },
     updateMatch(state, { index, match }) {
   if (index >= 0 && index < state.schedule.length) {
-    // Защита от строк — всегда объект
     if (match.fighter1 && typeof match.fighter1 === 'string') {
       match.fighter1 = { name: match.fighter1 }
     }
     if (match.fighter2 && typeof match.fighter2 === 'string') {
       match.fighter2 = { name: match.fighter2 }
+    }
+    if (match.result && typeof match.result === 'object' && match.result.name) {
+      match.result = match.result.name
     }
     let newStage = match.stage;
     if (match.status === 'finished' && !match.stage) {

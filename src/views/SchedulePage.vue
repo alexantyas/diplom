@@ -52,12 +52,12 @@
       </li>
     </ul>
 
-    <!-- ОДНА ТАБЛИЦА С СЕКЦИЕЙ ПО АКТИВНОЙ ВКЛАДКЕ -->
+    <!-- Таблица с секцией по активной вкладке -->
     <div class="table-responsive">
       <table class="table table-bordered table-sm m-0"
              style="table-layout: fixed; width: 1600px; min-width: 1600px; white-space:nowrap;">
         <colgroup>
-          <col style="width: 30px;">
+          <col style="width: 40px;">
           <col style="width: 60px;">
           <col style="width: 90px;">
           <col style="width: 250px;">
@@ -138,18 +138,18 @@
               />
             </td>
             <td>
-              <select v-model="m.result"
-                      class="form-select form-select-sm"
-                      @change="updateMatch(m)">
-                <option :value="null">–</option>
-                <option v-if="m.fighter1" :value="m.fighter1">
-                  {{ getFighterName(m.fighter1) }} ({{ m.fighter1.type === 'team' ? 'командный' : 'индивидуальный' }})
-                </option>
-                <option v-if="m.fighter2" :value="m.fighter2">
-                  {{ getFighterName(m.fighter2) }} ({{ m.fighter2.type === 'team' ? 'командный' : 'индивидуальный' }})
-                </option>
-              </select>
-            </td>
+  <select v-model="m.result"
+        class="form-select form-select-sm"
+        @change="updateMatch(m)">
+  <option :value="null">–</option>
+  <option v-if="m.fighter1" :value="getFighterName(m.fighter1)">
+    {{ getFighterName(m.fighter1) }} ({{ m.fighter1.type === 'team' ? 'командный' : 'индивидуальный' }})
+  </option>
+  <option v-if="m.fighter2" :value="getFighterName(m.fighter2)">
+    {{ getFighterName(m.fighter2) }} ({{ m.fighter2.type === 'team' ? 'командный' : 'индивидуальный' }})
+  </option>
+</select>
+</td>
             <td>
               <input v-model="m.note"
                      class="form-control form-control-sm"
@@ -163,11 +163,11 @@
             </td>
             <td>
               <select v-model="m.status"
-                      class="form-select form-select-sm"
-                      @change="updateMatch(m)">
-                <option value="upcoming">Не начат</option>
-                <option value="finished">Завершен</option>
-              </select>
+        class="form-select form-select-sm"
+        @change="updateMatch(m)">
+  <option value="upcoming">Не начат</option>
+  <option value="finished">Завершен</option>
+</select>
             </td>
           </tr>
         </tbody>
@@ -193,9 +193,7 @@ export default {
     const selectedJudge    = ref('');
     const activeTab = ref('upcoming');
 
-    const {
-      setWinner: bracketSetWinner,
-    } = useBracketStore();
+    const { setWinner: bracketSetWinner } = useBracketStore();
 
     const schedule = computed(() => Array.isArray(store.state.schedule) ? store.state.schedule : []);
     const judges   = computed(() => store.state.judges);
@@ -222,20 +220,86 @@ export default {
         : finishedMatches.value;
     });
 
-    // Универсальная функция для вывода имени
-   function getFighterName(f) {
-  if (!f) return '—'
-  if (typeof f === 'string') return f
-  if (typeof f === 'object' && f.name) return getFighterName(f.name)
-  return ''
-}
+    function getFighterName(f) {
+      if (!f) return '—'
+      if (typeof f === 'string') return f
+      if (typeof f === 'object' && f.name) return f.name
+      return ''
+    }
+
+    // Новый: при выборе результата — возвращаем только имя!
+    function setMatchResult(m, name) {
+      m.result = name || null
+      updateMatch(m)
+    }
 
     const getMatchIndex = m => schedule.value.findIndex(x => x.id === m.id);
 
+    // --- Функция продвижения победителя на следующий этап (только по строкам) ---
     const promoteWinnerToNextStage = (match) => {
-      // ... твоя старая логика ...
-    };
+  const stageOrder = ['1/16 финала', '1/8 финала', '1/4 финала', '1/2 финала', 'Финал'];
+  const nextStageMap = {
+    '1/16 финала': '1/8 финала',
+    '1/8 финала': '1/4 финала',
+    '1/4 финала': '1/2 финала',
+    '1/2 финала': 'Финал',
+  };
+  const currentStage = match.stage;
+  const nextStage = nextStageMap[currentStage];
+  if (!nextStage) return;
 
+  // 1. Все завершённые матчи текущего этапа
+  const finishedCurrent = schedule.value.filter(m =>
+    m.stage === currentStage && m.status === 'finished' && m.result && m.category === match.category
+  );
+  if (finishedCurrent.length < 2) return; // Если недостаточно пар для следующей стадии — выходим
+
+  // 2. Все участники следующего этапа (уже созданные пары)
+  const nextStageMatches = schedule.value.filter(m =>
+    m.stage === nextStage && m.category === match.category
+  );
+
+  // 3. Собрать всех победителей текущей стадии
+  const allWinners = finishedCurrent.map(m =>
+    typeof m.result === 'object' ? m.result : { name: m.result, type: (m.fighter1 && m.fighter1.name === m.result) ? m.fighter1.type : (m.fighter2 ? m.fighter2.type : undefined) }
+  );
+
+  // 4. Собрать имена, которые уже участвуют в следующем этапе
+  const alreadyInNext = new Set();
+  nextStageMatches.forEach(m => {
+    if (m.fighter1?.name) alreadyInNext.add(m.fighter1.name);
+    if (m.fighter2?.name) alreadyInNext.add(m.fighter2.name);
+  });
+
+  // 5. Отобрать тех, кто ещё НЕ в следующем этапе
+  const freeWinners = allWinners.filter(w => !alreadyInNext.has(w.name));
+
+  // 6. Сформировать все возможные пары из свободных победителей
+  while (freeWinners.length >= 2) {
+    const f1 = freeWinners.shift();
+    const f2 = freeWinners.shift();
+    store.commit('addMatch', {
+      id: Date.now() + Math.floor(Math.random() * 10000),
+      competition_id: match.competition_id,
+      category: match.category,
+      fighter1: { name: f1.name, type: f1.type },
+      fighter2: { name: f2.name, type: f2.type },
+      stage: nextStage,
+      time: '',
+      judge: '',
+      referee: '',
+      tatami: '',
+      result: null,
+      note: '',
+      points: 0,
+      status: 'upcoming',
+    });
+  }
+  localStorage.setItem(getScheduleKey(competitionId), JSON.stringify(store.state.schedule));
+};
+
+
+    // --- Оновление состояния матча и вызов продвижения на этап ---
     const updateMatch = m => {
       const idx = getMatchIndex(m);
       if (idx === -1) return;
@@ -307,8 +371,8 @@ export default {
             id:             num++,
             competition_id: competitionId,
             category:       `${weight} кг`,
-            fighter1:       { name: fighter1.name }, // ГАРАНТИРОВАННО объект
-            fighter2:       { name: fighter2.name },
+            fighter1:       { name: fighter1.name, type: fighter1.type },
+            fighter2:       { name: fighter2.name, type: fighter2.type },
             stage:          stage,
             time:           '',
             judge:          randJ?.name   || '',
@@ -336,6 +400,7 @@ export default {
       });
       localStorage.setItem(getScheduleKey(competitionId), JSON.stringify(store.state.schedule));
     };
+
     const saveSchedule = async () => {
       alert('Расписание сохранено (локально)');
     };
@@ -353,8 +418,21 @@ export default {
     return {
       judges, selectedCategory, selectedJudge, uniqueCategories,
       generateSchedule, addMatch, saveSchedule, saveResults,
-      updateMatch, activeTab, currentMatches, getFighterName
+      updateMatch, setMatchResult, activeTab, currentMatches, getFighterName,promoteWinnerToNextStage 
     };
   }
 };
 </script>
+
+<style scoped>
+.table th { background-color:#f8f9fa; white-space:nowrap; }
+.table td { vertical-align:middle; }
+.upcoming-match { background-color:rgba(248,249,250,0.5); }
+.finished-match { background-color:rgba(198,239,206,0.5); }
+.bracket-match { background-color:rgba(207,226,255,0.5); }
+.text-success.fw-bold { font-weight:600; }
+input[type="time"] { min-width:110px; }
+.badge { font-size:0.85em; padding:0.35em 0.65em; }
+.nav-tabs { background: #f8f9fa; }
+.nav-link.active { background: #fff; border-color: #dee2e6 #dee2e6 #fff; }
+</style>
