@@ -63,7 +63,7 @@
 </template>
 
 <script>
-import { computed } from 'vue'
+import { computed, onMounted, watch } from 'vue'
 import { useBracketStore } from '@/store/bracketStore'
 
 export default {
@@ -77,37 +77,54 @@ export default {
       top8Matches,
       top4Matches,
       finalMatch,
+      initializeBracket,
       setWinner,
       selectCategory,
     } = useBracketStore()
 
+    // Составляем список раундов для отрисовки
     const bracketRounds = computed(() => {
-      const rounds = [];
-      if (Array.isArray(top16Matches.value) && top16Matches.value.length > 0) {
-        rounds.push({ title: '1/8 финала', matches: top16Matches.value, stage: 16 });
+      const rounds = []
+      if (Array.isArray(top16Matches.value) && top16Matches.value.length) {
+        rounds.push({ title: '1/8 финала', matches: top16Matches.value, stage: 16 })
       }
-      if (Array.isArray(top8Matches.value) && top8Matches.value.length > 0) {
-        rounds.push({ title: '1/4 финала', matches: top8Matches.value, stage: 8 });
+      if (Array.isArray(top8Matches.value) && top8Matches.value.length) {
+        rounds.push({ title: '1/4 финала', matches: top8Matches.value, stage: 8 })
       }
-      if (Array.isArray(top4Matches.value) && top4Matches.value.length > 0) {
-        rounds.push({ title: '1/2 финала', matches: top4Matches.value, stage: 4 });
+      if (Array.isArray(top4Matches.value) && top4Matches.value.length) {
+        rounds.push({ title: '1/2 финала', matches: top4Matches.value, stage: 4 })
       }
       if (
         finalMatch.value &&
-        typeof finalMatch.value === 'object' &&
         (finalMatch.value.participant1 || finalMatch.value.participant2)
       ) {
-        rounds.push({ title: 'Финал', matches: [finalMatch.value], stage: 2 });
+        rounds.push({ title: 'Финал', matches: [finalMatch.value], stage: 2 })
       }
-      return rounds;
-    });
+      return rounds
+    })
 
-  function getFighterName(f) {
-  if (!f) return '—'
-  if (typeof f === 'string') return f
-  if (typeof f === 'object' && f.name) return getFighterName(f.name)
-  return ''
-}
+    // Универсальный вывод имени бойца
+    function getFighterName(f) {
+      if (!f) return '—'
+      if (typeof f === 'string') return f
+      if (typeof f === 'object' && f.name) return f.name
+      return ''
+    }
+
+    // При монтировании, если категория уже выбрана, подгружаем брэкет
+    onMounted(() => {
+      if (selectedCategory.value) {
+        initializeBracket()
+      }
+    })
+
+    // При смене категории — выставляем её и инициализируем брэкет
+    watch(selectedCategory, newCat => {
+      if (newCat) {
+        selectCategory(newCat)
+        initializeBracket()
+      }
+    })
 
     return {
       selectedCategory,
@@ -122,6 +139,7 @@ export default {
   }
 }
 </script>
+
 
 
 <style scoped>

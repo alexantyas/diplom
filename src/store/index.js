@@ -2,6 +2,7 @@
 import { createStore } from 'vuex';
 import api from '@/api';
 import { getApprovedApplications, getMatchesByCompetition } from '@/api';
+import { patchMatch, getBracket, postBracketResults } from '@/api'
 
 const SCHEDULE_KEY_BASE = 'schedule'
 function getScheduleKey(competitionId) {
@@ -113,24 +114,28 @@ export default createStore({
     match.fighter2 = { name: match.fighter2 }
   }
   state.schedule.push(match);
-  localStorage.setItem('schedule', JSON.stringify(state.schedule));
+  
+  // Use a replacer function to handle circular references
+  const getCircularReplacer = () => {
+    const seen = new WeakSet();
+    return (key, value) => {
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) {
+          return; // Skip circular reference
+        }
+        seen.add(value);
+      }
+      return value;
+    };
+  };
+  
+  localStorage.setItem('schedule', JSON.stringify(state.schedule, getCircularReplacer()));
 },
 setSchedule(state, schedule) {
-  for (const match of schedule) {
-    if (match.fighter1 && typeof match.fighter1 === 'string') {
-      match.fighter1 = { name: match.fighter1 }
-    }
-    if (match.fighter2 && typeof match.fighter2 === 'string') {
-      match.fighter2 = { name: match.fighter2 }
-    }
-    // Исправить поле result если оно объект
-    if (match.result && typeof match.result === 'object' && match.result.name) {
-      match.result = match.result.name
-    }
-  }
-  state.schedule = schedule;
-  localStorage.setItem('schedule', JSON.stringify(schedule));
-},
+    state.schedule = schedule;
+    localStorage.setItem('schedule', JSON.stringify(schedule));
+  },
+
     updateMatch(state, { index, match }) {
   if (index >= 0 && index < state.schedule.length) {
     if (match.fighter1 && typeof match.fighter1 === 'string') {
@@ -161,12 +166,42 @@ setSchedule(state, schedule) {
     }
     state.schedule[index] = updatedMatch;
   }
-  localStorage.setItem('schedule', JSON.stringify(state.schedule));
+  
+  // In updateMatch mutation
+  const getCircularReplacer = () => {
+    const seen = new WeakSet();
+    return (key, value) => {
+      if (typeof value === "object" && value !== null) {
+        if (seen.has(value)) {
+          return; // Skip circular reference
+        }
+        seen.add(value);
+      }
+      return value;
+    };
+  };
+  
+  localStorage.setItem('schedule', JSON.stringify(state.schedule, getCircularReplacer()));
 },
 
     removeMatch(state, index) {
       state.schedule.splice(index, 1);
-      localStorage.setItem('schedule', JSON.stringify(state.schedule));
+      
+      // Use a replacer function to handle circular references
+      const getCircularReplacer = () => {
+        const seen = new WeakSet();
+        return (key, value) => {
+          if (typeof value === "object" && value !== null) {
+            if (seen.has(value)) {
+              return; // Skip circular reference
+            }
+            seen.add(value);
+          }
+          return value;
+        };
+      };
+      
+      localStorage.setItem('schedule', JSON.stringify(state.schedule, getCircularReplacer()));
     },
 
     // --- Прочее (для результатов и сетки) ---
@@ -181,10 +216,39 @@ setSchedule(state, schedule) {
     },
     SET_TOURNAMENT_RESULTS(state, results) {
       state.tournamentResults = results;
-      localStorage.setItem('tournamentResults', JSON.stringify(results));
+      
+      // Используем функцию для обработки циклических ссылок
+      const getCircularReplacer = () => {
+        const seen = new WeakSet();
+        return (key, value) => {
+          if (typeof value === "object" && value !== null) {
+            if (seen.has(value)) {
+              return; // Skip circular reference
+            }
+            seen.add(value);
+          }
+          return value;
+        };
+      };
+      
+      localStorage.setItem('tournamentResults', JSON.stringify(results, getCircularReplacer()));
     },
     setBracketState(state, bracketState) {
-      const stateToSave = JSON.parse(JSON.stringify(bracketState));
+      // In setBracketState mutation
+      const getCircularReplacer = () => {
+        const seen = new WeakSet();
+        return (key, value) => {
+          if (typeof value === "object" && value !== null) {
+            if (seen.has(value)) {
+              return; // Skip circular reference
+            }
+            seen.add(value);
+          }
+          return value;
+        };
+      };
+      
+      const stateToSave = JSON.parse(JSON.stringify(bracketState, getCircularReplacer()));
       state.bracketState = stateToSave;
       localStorage.setItem('bracketState', JSON.stringify(stateToSave));
     },
@@ -246,13 +310,21 @@ setSchedule(state, schedule) {
     },
 
     async loadSchedule({ commit }, competitionId) {
-      if (!competitionId) throw new Error('Competition ID is missing');
-      const { data } = await getMatchesByCompetition(competitionId);
-      commit('setSchedule', data);
-      localStorage.setItem(getScheduleKey(competitionId), JSON.stringify(data));
-    },
+    if (!competitionId) throw new Error('Competition ID is missing');
+    const { data } = await getMatchesByCompetition(competitionId);
+    commit('setSchedule', data);
+  },
 
-    // --- Сохранение результатов турнира в localStorage (как раньше) ---
+    async updateScheduleMatch({ commit, state }, { id, updateData }) {
+    // 1) Отправляем PATCH на бэкенд
+    const { data: updated } = await patchMatch(id, updateData);
+    // 2) Ищем его в state.schedule и коммитим обновлённый
+    const idx = state.schedule.findIndex(m => m.id === id);
+    if (idx !== -1) {
+      commit('updateMatch', { index: idx, match: updated });
+    }
+    return updated;
+  },// --- Сохранение результатов турнира в localStorage (как раньше) ---
     async saveResults({ state }) {
       const results = {
         competition: state.competition,
@@ -289,11 +361,31 @@ setSchedule(state, schedule) {
       await dispatch('fetchUsers');
     },
 
-    async saveTournamentResults({ commit, state }, results) {
-      const arr = [...state.tournamentResults, results];
-      commit('SET_TOURNAMENT_RESULTS', arr);
-      return true;
-    },
+    async saveTournamentResults({ commit, state }) {
+    const compId = state.competition.id;
+    // 1) Группируем все матчи по stage
+    const rounds = {};
+    for (const m of state.schedule) {
+      const stage = m.stage || 'unknown';
+      if (!rounds[stage]) rounds[stage] = [];
+      rounds[stage].push({
+        id:                         m.id,
+        stage:                      m.stage,
+        status:                     m.status,
+        winner_participant_type:    m.winner_participant_type,
+        winner_participant_id:      m.winner_participant_id,
+        points1:                    m.points1,
+        points2:                    m.points2,
+        comment:                    m.comment
+      });
+    }
+    // 2) Шлём единый POST
+    await postBracketResults(compId, { rounds });
+    // 3) Обновляем schedule свежими данными
+    const { data } = await getMatchesByCompetition(compId);
+    commit('setSchedule', data);
+    return true;
+  },
 
     clearAllData({ commit }) {
       commit('clearSchedule');
@@ -312,6 +404,18 @@ setSchedule(state, schedule) {
         default: return null;
       }
     },
+   weightCategories: state => {
+      const s = new Set()
+      for (const p of state.participants) {
+        if (p.weight != null) {
+          s.add(`${p.weight} кг`)
+        }
+      }
+      // опционально сортируем по числу
+      return Array.from(s).sort((a, b) => parseInt(a) - parseInt(b))
+    },
+  
+
     competition: state => state.competition,
     teams: state => state.teams,
     participants: state => state.participants,

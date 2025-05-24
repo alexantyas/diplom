@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const api = axios.create({
-  baseURL: 'http://localhost:8000', // Убедись, что CORS разрешён на бэке
+  baseURL: 'http://localhost:8000', // Убедитесь, что CORS разрешён на бэке
 });
 
 // 🔒 Добавляем токен ко всем запросам, кроме /auth/token
@@ -32,22 +32,35 @@ export async function getProfile() {
 // 📥 Получить заявки (одобренные)
 export function getApprovedApplications(competitionId) {
   return api.get('/applications/', {
-    // ← обязательно в params, а не в body!
     params: { competition_id: competitionId }
-  })
-}
-
-// 📤 Получить матчи по соревнованию
-export function getMatchesByCompetition(compId) {
-  // теперь идёт через api.create({ baseURL, headers })
-  return api.get(`/matches/`, {
-   params: { competition_id: compId }
   });
 }
 
+// 📥 Получить матчи по соревнованию
+export function getMatchesByCompetition(compId) {
+  return api.get('/matches/', {
+    params: { competition_id: compId }
+  });
+}
+
+// PATCH одного матча
+export function patchMatch(id, data) {
+  return api.patch(`/matches/${id}`, data);
+}
+
 // 📦 Пакетное создание матчей
-export function createMatchesBatch(matches, competitionId) {
-  return api.post(`/matches/batch?competition_id=${competitionId}`, matches);
+export function createMatchesBatch(matches) {
+  return api.post('/matches/batch', matches);
+}
+
+// GET брэкет турнира
+export function getBracket(compId) {
+  return api.get(`/competitions/${compId}/bracket`);
+}
+
+// POST результатов брэкета
+export function postBracketResults(compId, payload) {
+  return api.post(`/competitions/${compId}/bracket`, payload);
 }
 
 // 📤 Обновить соревнование (PUT)
