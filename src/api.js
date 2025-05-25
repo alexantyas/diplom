@@ -44,8 +44,18 @@ export function getMatchesByCompetition(compId) {
 }
 
 // PATCH одного матча
-export function patchMatch(id, data) {
-  return api.patch(`/matches/${id}`, data);
+
+export function putMatch(id, data) {
+  console.log('[DEBUG][API] patchMatch called →', id, data);
+  return api.patch(`/matches/${id}`, data)
+    .then(resp => {
+      console.log('[DEBUG][API] patchMatch response →', resp.status, resp.data);
+      return resp;
+    })
+    .catch(err => {
+      console.error('[DEBUG][API] patchMatch error →', err);
+      throw err;
+    });
 }
 
 // 📦 Пакетное создание матчей

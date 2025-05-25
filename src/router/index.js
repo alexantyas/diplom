@@ -56,7 +56,7 @@ const routes = [
     { path: '', redirect: 'teams' },
     { path: 'created', component: () => import('@/views/CreatedCompetitions.vue') }, // ✅ ДОБАВЬ ЭТО
     { path: 'teams', component: TeamsPage, meta: { requiresAuth: true, roles: ['organizer'] } },
-    { path: 'schedule', component: SchedulePage },
+    
     { path: 'judges', component: JudgesPage },
     { path: 'print', component: PrintPage, meta: { requiresAuth: true, roles: ['organizer', 'secretariat', 'admin'] } },
     { path: 'participants', component: ParticipantsPage, meta: { requiresAuth: true, roles: ['organizer'] } },

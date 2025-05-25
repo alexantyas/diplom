@@ -52,7 +52,7 @@
       </li>
     </ul>
 
-    <!-- Таблица с секцией по активной вкладке -->
+    <!-- Таблица -->
     <div class="table-responsive">
       <table class="table table-bordered table-sm m-0"
              style="table-layout: fixed; width: 1600px; min-width: 1600px; white-space:nowrap;">
@@ -89,36 +89,26 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(m, i) in currentMatches" :key="i">
+          <tr v-for="(m, i) in currentMatches" :key="m.id || i">
             <td>{{ i+1 }}</td>
             <td>
-              <span v-if="m.stage" class="badge bg-info">{{ m.stage }}</span>
-              <span v-else>-</span>
+              <span v-if="m.stage" class="badge bg-info">{{ m.stage }}</span><span v-else>-</span>
             </td>
             <td><span class="badge bg-secondary">{{ m.category }}</span></td>
-            <td>
-              <span>
-                {{ getNameById(m.red_participant_type, m.red_participant_id) }}
-              </span>
-            </td>
-            <td>
-             <span>
-                {{ getNameById(m.blue_participant_type, m.blue_participant_id) }}
-             </span>
-            </td>
+            <td>{{ getNameById(m.red_participant_type, m.red_participant_id) }}</td>
+            <td>{{ getNameById(m.blue_participant_type, m.blue_participant_id) }}</td>
             <td>
               <input type="time"
                      v-model="m.time"
                      class="form-control form-control-sm"
                      :disabled="activeTab === 'finished'"
-                     @change="updateMatch(m)"
-              />
+                     @change="updateField(m)" />
             </td>
             <td>
               <select v-model="m.judge"
                       class="form-select form-select-sm"
                       :disabled="activeTab === 'finished'"
-                      @change="updateMatch(m)">
+                      @change="updateField(m)">
                 <option value="">–</option>
                 <option v-for="j in judges" :key="j.name" :value="j.name">{{ j.name }}</option>
               </select>
@@ -127,7 +117,7 @@
               <select v-model="m.referee"
                       class="form-select form-select-sm"
                       :disabled="activeTab === 'finished'"
-                      @change="updateMatch(m)">
+                      @change="updateField(m)">
                 <option value="">–</option>
                 <option v-for="j in judges" :key="j.name+'r'" :value="j.name">{{ j.name }}</option>
               </select>
@@ -136,56 +126,57 @@
               <input v-model="m.tatami"
                      class="form-control form-control-sm"
                      :disabled="activeTab === 'finished'"
-                     @change="updateMatch(m)"
-              />
+                     @change="updateField(m)" />
             </td>
             <td>
-  <select
-    v-model="m.result"
-    class="form-select form-select-sm"
-    :disabled="activeTab === 'finished'"
-    @change="updateMatch(m)"
-  >
-    <!-- Пустой вариант -->
-    <option :value="null">–</option>
-
-    <!-- Красный участник -->
-    <option
-      v-if="m.red_participant_id"
-      :value="getNameById(m.red_participant_type, m.red_participant_id)"
-    >
-      {{ getNameById(m.red_participant_type, m.red_participant_id) }}
-      ({{ m.red_participant_type === 'team' ? 'командный' : 'индивидуальный' }})
-    </option>
-
-    <!-- Синий участник -->
-    <option
-      v-if="m.blue_participant_id"
-      :value="getNameById(m.blue_participant_type, m.blue_participant_id)"
-    >
-      {{ getNameById(m.blue_participant_type, m.blue_participant_id) }}
-      ({{ m.blue_participant_type === 'team' ? 'командный' : 'индивидуальный' }})
-    </option>
-  </select>
-</td>
+              <template v-if="m.status === 'finished' && m.winner_participant_id">
+                {{ getNameById(m.winner_participant_type, m.winner_participant_id) }}
+                <span class="text-muted">
+                  ({{ m.winner_participant_type === 'team' ? 'командный' : 'индивидуальный' }})
+                </span>
+              </template>
+              <template v-else>
+                <select
+                  v-model="selectedResults[m.id]"
+                  class="form-select form-select-sm"
+                  :disabled="activeTab === 'finished'"
+                >
+                  <option :value="null">–</option>
+                  <option
+                    v-if="m.red_participant_id"
+                    :value="JSON.stringify({id: m.red_participant_id, type: m.red_participant_type})"
+                  >
+                    {{ getNameById(m.red_participant_type, m.red_participant_id) }}
+                    ({{ m.red_participant_type === 'team' ? 'командный' : 'индивидуальный' }})
+                  </option>
+                  <option
+                    v-if="m.blue_participant_id"
+                    :value="JSON.stringify({id: m.blue_participant_id, type: m.blue_participant_type})"
+                  >
+                    {{ getNameById(m.blue_participant_type, m.blue_participant_id) }}
+                    ({{ m.blue_participant_type === 'team' ? 'командный' : 'индивидуальный' }})
+                  </option>
+                </select>
+              </template>
+            </td>
             <td>
               <input v-model="m.note"
                      class="form-control form-control-sm"
-                     @change="updateMatch(m)" />
+                     @change="updateField(m)" />
             </td>
             <td>
               <input type="number"
                      v-model.number="m.points"
                      class="form-control form-control-sm"
-                     @change="updateMatch(m)" />
+                     @change="updateField(m)" />
             </td>
             <td>
               <select v-model="m.status"
-        class="form-select form-select-sm"
-        @change="updateMatch(m)">
-  <option value="upcoming">Не начат</option>
-  <option value="finished">Завершен</option>
-</select>
+                      class="form-select form-select-sm"
+                      @change="onStatusChange(m, $event.target.value)">
+                <option value="upcoming">Не начат</option>
+                <option value="finished">Завершен</option>
+              </select>
             </td>
           </tr>
         </tbody>
@@ -198,21 +189,26 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
-import { useBracketStore } from '@/store/bracketStore'
-import { createMatchesBatch, getApprovedApplications } from '@/api'
-import { getScheduleKey } from '@/utils/storageKeys'
+import { createMatchesBatch } from '@/api'
 
 export default {
   setup() {
     const store = useStore()
     const route = useRoute()
     const competitionId = Number(route.params.id)
+    const selectedResults = ref({})
+
+    // Сброс выбора при изменении расписания
+    const schedule = computed(() => store.state.schedule || [])
+    watch(schedule, () => { selectedResults.value = {} })
+
+    const judges = computed(() => store.state.judges || [])
+    const participants = computed(() => store.state.participants || [])
 
     const uniqueCategories = computed(() =>
       Array.from(new Set(schedule.value.map(m => m.category)))
     )
 
-    const participants = computed(() => store.state.participants || [])
     const participantsMap = computed(() => {
       const m = {}
       for (const p of participants.value) {
@@ -220,46 +216,14 @@ export default {
       }
       return m
     })
-    const weightMap = computed(() => {
-      const m = {}
-      for (const p of participants.value) {
-        m[`${p.type}:${p.id}`] = p.weight
-      }
-      return m
-    })
     function getNameById(type, id) {
       return participantsMap.value[`${type}:${id}`] || '—'
     }
-    function getWeightById(type, id) {
-      const w = weightMap.value[`${type}:${id}`]
-      return w != null ? `${w} кг` : ''
-    }
 
-    // фильтры и табы
     const selectedCategory = ref('')
-    const selectedJudge    = ref('')
-    const activeTab        = ref('upcoming')
+    const selectedJudge = ref('')
+    const activeTab = ref('upcoming')
 
-    // работа с брэкетом
-    const {
-      top32Matches,
-      top16Matches,
-      top8Matches,
-      top4Matches,
-      finalMatch,
-      thirdPlaceMatch,
-      initializeBracket,
-      setWinner: bracketSetWinner,
-      selectCategory
-    } = useBracketStore()
-
-    // расписание и список судей
-    const schedule = computed(() => store.state.schedule || [])
-    const judges   = computed(() => store.state.judges   || [])
-
-    // список категорий для фильтра
-    
-    // фильтрация
     const filterMatches = arr => arr.filter(m =>
       (!selectedCategory.value || m.category === selectedCategory.value) &&
       (!selectedJudge.value    || m.judge    === selectedJudge.value)
@@ -274,284 +238,215 @@ export default {
       activeTab.value === 'upcoming' ? upcomingMatches.value : finishedMatches.value
     )
 
-    // порядок стадий
-    const STAGES = [
-      '1/16 финала',
-      '1/8 финала',
-      '1/4 финала',
-      '1/2 финала',
-      'Финал'
-    ]
-    function nextStage(stage) {
-      const i = STAGES.indexOf(stage)
-      return i >= 0 && i < STAGES.length - 1 ? STAGES[i + 1] : null
-    }
+    // Обработчик смены статуса
+    async function onStatusChange(m, newStatus) {
+      console.log('[DEBUG] onStatusChange for match', m.id, 'newStatus=', newStatus)
+      let winner_id = null
+      let winner_type = null
 
-    // после завер­шения всех матчей в одной стадии, формируем следующую
-    async function advanceToNextStage(category, fromStage) {
-      const toStage = nextStage(fromStage)
-      if (!toStage) return
-
-      // выбираем все завершённые матчи этой категории и стадии
-      const finished = store.state.schedule.filter(m =>
-        m.category === category &&
-        m.stage    === fromStage &&
-        m.status   === 'finished' &&
-        m.winner_participant_id != null
-      )
-
-      // собираем массив победителей
-      const winners = finished.map(m => ({
-        type: m.winner_participant_type,
-        id:   m.winner_participant_id
-      }))
-
-      // формируем DTO для первых n/2 пар
-      const dtos = []
-      for (let i = 0; i + 1 < winners.length; i += 2) {
-        const a = winners[i]
-        const b = winners[i + 1]
-        dtos.push({
-          red_participant_type:   a.type,
-          red_participant_id:     a.id,
-          blue_participant_type:  b.type,
-          blue_participant_id:    b.id,
-          competition_id:         competitionId,
-          category,               // сохраняем ту же категорию
-          stage:                  toStage,
-          status:                 'upcoming',
-          referee_id:             null,
-          judge_id:               null,
-          match_time:             null,
-          score:                  null,
-          comment:                null
-        })
+      // достаём выбор победителя
+      const sel = selectedResults.value[m.id]
+      if (newStatus === 'finished' && sel) {
+        try {
+          const obj = JSON.parse(sel)
+          winner_id = obj.id
+          winner_type = obj.type
+        } catch {}
       }
 
-      if (!dtos.length) return
-
-      // создаём на бэке и впиливаем в стор
-      const { data: newMatches } = await createMatchesBatch(dtos)
-      newMatches.forEach(m => m.category = category)
-      store.commit('setSchedule', [
-        ...store.state.schedule,
-        ...newMatches
-      ])
-      localStorage.setItem(
-        getScheduleKey(competitionId),
-        JSON.stringify(store.state.schedule)
-      )
-    }
-const updateMatch = async m => {
       const updateData = {
-        stage:       m.stage,
-        match_time:  m.time,
-        judge_id:    judges.value.find(j => j.name === m.judge)?.id || null,
-        referee_id:  judges.value.find(j => j.name === m.referee)?.id || null,
-        status:      m.status,
-        score:       m.points,
-        comment:     m.note,
-        result:      m.result,
-        // эти два поля должны быть возвращены бэком в ответе PATCH
-        // и попадут в state.schedule через экшен
-        // winner_participant_type и winner_participant_id
+        stage:        m.stage,
+        match_time:   m.time,
+        judge_id:     judges.value.find(j => j.name === m.judge)?.id || null,
+        referee_id:   judges.value.find(j => j.name === m.referee)?.id || null,
+        status:       newStatus,
+        score:        m.points,
+        comment:      m.note,
+        ...(newStatus === 'finished' && winner_id
+          ? { winner_participant_id: winner_id, winner_participant_type: winner_type }
+          : {})
       }
 
-      // отправляем патч
+      console.log('PATCH updateData:', updateData)
+      // отправка обновления
       await store.dispatch('updateScheduleMatch', {
-        id:         m.id,
-        updateData
-      })
-
-      // если матч помечен как "finished", продвигаем победителя
-      if (m.status === 'finished' && m.winner_participant_id) {
-        await advanceToNextStage(m.category, m.stage)
-      }
-    }
-    // генерация расписания по заявкам
-    const generateSchedule = async () => {
-      try {
-        await store.dispatch('loadApprovedApplications', competitionId)
-        const apps = store.state.applications.filter(a => a.status === 'approved')
-        if (!apps.length) {
-          alert('Нет одобренных заявок')
-          return
-        }
-
-        // собираем участников
-        const parts = []
-        for (const app of apps) {
-          if (Array.isArray(app.team_participants)) {
-            for (const p of app.team_participants) {
-              parts.push({
-                id:     p.id,
-                type:   'team',
-                name:   `${p.last_name} ${p.first_name}`.trim(),
-                team:   app.team_id,
-                weight: p.weight
-              })
-            }
-          }
-          if (Array.isArray(app.individual_participants) && app.individual_participants.length) {
-            const ip = app.individual_participants[0]
-            parts.push({
-              id:     ip.user.id,
-              type:   'individual',
-              name:   `${ip.user.last_name} ${ip.user.first_name}`.trim(),
-              team:   null,
-              weight: ip.user.weight
-            })
-          }
-        }
-        store.commit('setParticipants', parts.map(p => ({
-          id: p.id, type: p.type, name: p.name, weight: p.weight
-        })))
-
-        // по весам группируем и создаём DTO
-        const byWeight = {}
-        parts.forEach(p => (byWeight[p.weight] ||= []).push(p))
-
-        const dtos = []
-        Object.entries(byWeight).forEach(([w, list]) => {
-          let stage = list.length === 2  ? 'Финал'
-                    : list.length === 4  ? '1/2 финала'
-                    : list.length === 8  ? '1/4 финала'
-                    : list.length === 16 ? '1/8 финала'
-                    : list.length === 32 ? '1/16 финала'
-                    : '1/8 финала'
-          const pool = [...list]
-          while (pool.length >= 2) {
-            const f1 = pool.shift()
-            const opp = f1.team != null
-              ? pool.filter(x => x.team !== f1.team)
-              : [...pool]
-            if (!opp.length) break
-            const f2 = opp[Math.floor(Math.random() * opp.length)]
-            pool.splice(pool.indexOf(f2), 1)
-
-            dtos.push({
-              red_participant_type:   f1.type,
-              red_participant_id:     f1.id,
-              blue_participant_type:  f2.type,
-              blue_participant_id:    f2.id,
-              competition_id: competitionId,
-              category:   `${w} кг`,      // <-- вот здесь критично
-              stage,
-              status:     'upcoming',
-              referee_id: null,
-              judge_id:   null,
-              match_time: null,
-              score:      null,
-              comment:    null
-            })
-          }
-        })
-
-        const { data: created } = await createMatchesBatch(dtos)
-        store.commit('setSchedule', created)
-        localStorage.setItem(
-          getScheduleKey(competitionId),
-          JSON.stringify(created)
-        )
-      }
-      catch (e) {
-        console.error(e)
-        alert('Ошибка генерации расписания')
-      }
-    }
-
-    // добавление одной схватки
-    const addMatch = async () => {
-      if (!selectedCategory.value) {
-        alert('Выберите категорию')
-        return
-      }
-      const dto = {
-        red_participant_type:  null,
-        red_participant_id:    null,
-        blue_participant_type: null,
-        blue_participant_id:   null,
-        competition_id: competitionId,
-        category:   selectedCategory.value,
-        stage:      '',
-        status:     'upcoming',
-        referee_id: null,
-        judge_id:   null,
-        match_time: null,
-        score:      null,
-        comment:    null
-      }
-      const { data } = await createMatchesBatch([dto])
-      store.commit('setSchedule', [...schedule.value, data[0]])
-    }
-
-    // перезагрузка расписания с сервера
-    const saveSchedule = async () => {
+  id: m.id,
+  updateData,
+  competitionId,
+})
+      // очистка селекта победителя
+      selectedResults.value[m.id] = null
+      // перезагрузка расписания и бранкета
       await store.dispatch('loadSchedule', competitionId)
-      alert('Расписание синхронизировано')
+      await store.dispatch('loadBracket', competitionId)
     }
 
-    // сохранить результаты турнира (брэкет)
-    const saveResults = async () => {
-      await store.dispatch('saveTournamentResults')
-      alert('Результаты сохранены')
+    // Общий апдейт остальных полей
+    async function updateField(m) {
+      const updateData = {
+        stage:      m.stage,
+        match_time: m.time,
+        judge_id:   judges.value.find(j => j.name === m.judge)?.id || null,
+        referee_id: judges.value.find(j => j.name === m.referee)?.id || null,
+        score:      m.points,
+        comment:    m.note
+      }
+      await store.dispatch('updateScheduleMatch', { id: m.id, updateData,competitionId })
     }
 
-    // обновление одного матча + продвижение победителя
-    
+    // Генерация расписания
+     const generateSchedule = async () => {
+  try {
+    // 1) Загрузить одобренные заявки
+    await store.dispatch('loadApprovedApplications', competitionId)
+    const apps = store.state.applications.filter(a => a.status === 'approved')
+    if (!apps.length) {
+      alert('Нет одобренных заявок')
+      return
+    }
 
-    // при монтировании — пытаемся взять из localStorage либо грузим
+    // 2) Собрать участников
+    const parts = []
+    for (const app of apps) {
+      if (Array.isArray(app.team_participants)) {
+        for (const p of app.team_participants) {
+          parts.push({
+            id:     p.id,
+            type:   'team',
+            name:   `${p.last_name} ${p.first_name}`.trim(),
+            team:   app.team_id,
+            weight: p.weight
+          })
+        }
+      }
+      if (Array.isArray(app.individual_participants) && app.individual_participants.length) {
+        const ip = app.individual_participants[0]
+        parts.push({
+          id:     ip.user.id,
+          type:   'individual',
+          name:   `${ip.user.last_name} ${ip.user.first_name}`.trim(),
+          team:   null,
+          weight: ip.user.weight
+        })
+      }
+    }
+    // сохранить участников в стор, если нужно
+    store.commit('setParticipants', parts.map(p => ({
+      id: p.id, type: p.type, name: p.name, weight: p.weight
+    })))
+
+    // 3) Группировка по весовым категориям и формирование пар
+    const byWeight = {}
+    parts.forEach(p => {
+      byWeight[p.weight] ||= []
+      byWeight[p.weight].push(p)
+    })
+
+    const dtos = []
+    Object.entries(byWeight).forEach(([w, list]) => {
+      const stage = list.length === 2   ? 'Финал'
+                  : list.length === 4   ? '1/2 финала'
+                  : list.length === 8   ? '1/4 финала'
+                  : list.length === 16  ? '1/8 финала'
+                  : list.length === 32  ? '1/16 финала'
+                  : '1/8 финала'
+
+      const pool = [...list]
+      while (pool.length >= 2) {
+        const f1 = pool.shift()
+        // исключаем матчи внутри одной команды
+        const oppCandidates = f1.team != null
+          ? pool.filter(x => x.team !== f1.team)
+          : [...pool]
+        if (!oppCandidates.length) break
+
+        const f2 = oppCandidates[Math.floor(Math.random() * oppCandidates.length)]
+        pool.splice(pool.indexOf(f2), 1)
+
+        dtos.push({
+          red_participant_type:   f1.type,
+          red_participant_id:     f1.id,
+          blue_participant_type:  f2.type,
+          blue_participant_id:    f2.id,
+          competition_id:         competitionId,
+          category:               `${w} кг`,
+          stage,
+          status:     'upcoming',
+          referee_id: null,
+          judge_id:   null,
+          match_time: null,
+          score:      null,
+          comment:    null
+        })
+      }
+    })
+
+    if (!dtos.length) {
+      alert('Нет участников для генерации расписания')
+      return
+    }
+
+    // 4) Сохранить партии на бэке и обновить расписание
+    await createMatchesBatch(dtos)
+    await store.dispatch('loadSchedule', competitionId)
+  }
+  catch (e) {
+    console.error(e)
+    alert('Ошибка генерации расписания')
+  }
+}
+
+// Добавление одной схватки
+const addMatch = async () => {
+  if (!selectedCategory.value) {
+    alert('Выберите категорию')
+    return
+  }
+  const dto = {
+    red_participant_type:  null,
+    red_participant_id:    null,
+    blue_participant_type: null,
+    blue_participant_id:   null,
+    competition_id,
+    category:   selectedCategory.value,
+    stage:      '',
+    status:     'upcoming',
+    referee_id: null,
+    judge_id:   null,
+    match_time: null,
+    score:      null,
+    comment:    null
+  }
+  await createMatchesBatch([dto])
+  await store.dispatch('loadSchedule', competitionId)
+}
+
+// Синхронизация расписания с бэкендом
+const saveSchedule = async () => {
+  await store.dispatch('loadSchedule', competitionId)
+  alert('Расписание синхронизировано')
+}
+
+// Сохранение результатов турнира
+const saveResults = async () => {
+  await store.dispatch('saveTournamentResults')
+  alert('Результаты сохранены')
+}
+
     onMounted(async () => {
       await store.dispatch('loadApprovedApplications', competitionId)
-      const key = getScheduleKey(competitionId)
-      const saved = localStorage.getItem(key)
-      if (saved) {
-        store.commit('setSchedule', JSON.parse(saved))
-      } else {
-        await store.dispatch('loadSchedule', competitionId)
-      }
+      await store.dispatch('loadSchedule', competitionId)
     })
-
-    // при смене категории — обновляем брэкет
-    watch(selectedCategory, cat => {
-      if (cat) {
-        selectCategory(cat.replace(' кг',''))
-        initializeBracket()
-      }
-    })
-
-    // при изменении расписания — если у текущей категории что-то изменилось, реинициализируем брэкет
-    watch(() => store.state.schedule, (newS, oldS) => {
-      if (!selectedCategory.value) return
-      const a = oldS.filter(m => m.category === selectedCategory.value)
-      const b = newS.filter(m => m.category === selectedCategory.value)
-      if (b.some((x,i) => !a[i] || x.status!==a[i].status || x.comment!==a[i].comment)) {
-        initializeBracket()
-      }
-    }, { deep: true })
 
     return {
-      judges,
-      selectedCategory,
-      selectedJudge,
-      uniqueCategories,
-      currentMatches,
-      activeTab,
-      getNameById,
-      getWeightById,
-      generateSchedule,
-      addMatch,
-      saveSchedule,
-      saveResults,
-      updateMatch,
-      advanceToNextStage,
+      judges, selectedCategory, selectedJudge, uniqueCategories,
+      currentMatches, activeTab, getNameById,
+      generateSchedule, addMatch, saveSchedule, saveResults,
+      selectedResults, onStatusChange, updateField
     }
   }
 }
 </script>
-
-
-
 
 <style scoped>
 .table th { background-color:#f8f9fa; white-space:nowrap; }
@@ -565,4 +460,3 @@ input[type="time"] { min-width:110px; }
 .nav-tabs { background: #f8f9fa; }
 .nav-link.active { background: #fff; border-color: #dee2e6 #dee2e6 #fff; }
 </style>
-

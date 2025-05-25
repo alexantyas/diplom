@@ -63,7 +63,7 @@
 </template>
 
 <script>
-import { computed, onMounted, watch } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useBracketStore } from '@/store/bracketStore'
 
 export default {
@@ -77,7 +77,7 @@ export default {
       top8Matches,
       top4Matches,
       finalMatch,
-      initializeBracket,
+      thirdPlaceMatch,
       setWinner,
       selectCategory,
     } = useBracketStore()
@@ -85,20 +85,20 @@ export default {
     // Составляем список раундов для отрисовки
     const bracketRounds = computed(() => {
       const rounds = []
-      if (Array.isArray(top16Matches.value) && top16Matches.value.length) {
+      if (top16Matches.value?.length) {
         rounds.push({ title: '1/8 финала', matches: top16Matches.value, stage: 16 })
       }
-      if (Array.isArray(top8Matches.value) && top8Matches.value.length) {
+      if (top8Matches.value?.length) {
         rounds.push({ title: '1/4 финала', matches: top8Matches.value, stage: 8 })
       }
-      if (Array.isArray(top4Matches.value) && top4Matches.value.length) {
+      if (top4Matches.value?.length) {
         rounds.push({ title: '1/2 финала', matches: top4Matches.value, stage: 4 })
       }
-      if (
-        finalMatch.value &&
-        (finalMatch.value.participant1 || finalMatch.value.participant2)
-      ) {
+      if (finalMatch.value && (finalMatch.value.participant1 || finalMatch.value.participant2)) {
         rounds.push({ title: 'Финал', matches: [finalMatch.value], stage: 2 })
+      }
+      if (thirdPlaceMatch.value && (thirdPlaceMatch.value.participant1 || thirdPlaceMatch.value.participant2)) {
+        rounds.push({ title: 'Матч за 3-е место', matches: [thirdPlaceMatch.value], stage: 0 })
       }
       return rounds
     })
@@ -111,20 +111,7 @@ export default {
       return ''
     }
 
-    // При монтировании, если категория уже выбрана, подгружаем брэкет
-    onMounted(() => {
-      if (selectedCategory.value) {
-        initializeBracket()
-      }
-    })
-
-    // При смене категории — выставляем её и инициализируем брэкет
-    watch(selectedCategory, newCat => {
-      if (newCat) {
-        selectCategory(newCat)
-        initializeBracket()
-      }
-    })
+    // При монтировании ничего не делаем (ждём выбора категории)
 
     return {
       selectedCategory,
