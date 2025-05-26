@@ -218,7 +218,6 @@ export default {
         // Загружаем информацию об участниках для каждого матча в категории
         for (const stage of categoryData.stageOrder) {
           for (let i = 0; i < categoryData.stages[stage].length; i++) {
-            // getMatchWithParticipants теперь синхронная функция, но оставим await для совместимости
             categoryData.stages[stage][i] = await getMatchWithParticipants(categoryData.stages[stage][i])
           }
         }
@@ -305,30 +304,28 @@ export default {
 
 <style scoped>
 .bracket-page {
-  padding: 10px;
-  background: #1a1a1a;
-  color: #ffffff;
-  height: 100vh;
+  padding: 15px;
+  background: #f5f5f5;
+  min-height: 100vh;
+  max-height: 100vh;
   overflow: hidden;
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
 }
 
 .bracket-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 10px;
-  padding: 8px 15px;
-  background: #2c2c2c;
-  border-radius: 4px;
-  border: 1px solid #404040;
+  margin-bottom: 20px;
+  padding: 15px 20px;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
 }
 
 .bracket-header h2 {
   margin: 0;
-  color: #ffffff;
-  font-size: 16px;
-  font-weight: 300;
+  color: #333;
+  font-size: 20px;
 }
 
 .competition-info {
@@ -337,71 +334,75 @@ export default {
 }
 
 .competition-name {
-  padding: 4px 8px;
-  background: #007acc;
+  padding: 6px 12px;
+  background: #3498db;
   color: white;
-  border-radius: 3px;
-  font-size: 11px;
-  font-weight: 400;
+  border-radius: 15px;
+  font-size: 12px;
+  font-weight: 600;
 }
 
 .category-tabs {
   display: flex;
-  gap: 5px;
-  margin-bottom: 15px;
-  padding: 0 10px;
+  gap: 6px;
+  margin-bottom: 20px;
+  padding: 0 15px;
   flex-wrap: wrap;
 }
 
 .category-tab {
-  padding: 6px 12px;
-  border: 1px solid #404040;
-  border-radius: 3px;
-  background: #2c2c2c;
-  color: #cccccc;
-  font-size: 11px;
-  font-weight: 400;
+  padding: 8px 15px;
+  border: 2px solid #e9ecef;
+  border-radius: 6px;
+  background: white;
+  color: #666;
+  font-size: 12px;
+  font-weight: 600;
   cursor: pointer;
   transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  gap: 4px;
+  gap: 6px;
 }
 
 .category-tab:hover {
-  border-color: #007acc;
-  color: #ffffff;
-  background: #333333;
+  border-color: #3498db;
+  color: #3498db;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(52, 152, 219, 0.2);
 }
 
 .category-tab.active {
-  background: #007acc;
-  border-color: #007acc;
+  background: #3498db;
+  border-color: #3498db;
   color: white;
+  box-shadow: 0 3px 10px rgba(52, 152, 219, 0.3);
 }
 
 .match-count {
-  background: rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.2);
   padding: 1px 4px;
-  border-radius: 2px;
-  font-size: 9px;
-  font-weight: 500;
+  border-radius: 8px;
+  font-size: 10px;
+}
+
+.category-tab.active .match-count {
+  background: rgba(255, 255, 255, 0.3);
 }
 
 .loading, .no-competition, .no-data {
   text-align: center;
-  padding: 20px;
-  background: #2c2c2c;
-  border-radius: 4px;
-  color: #cccccc;
-  font-size: 13px;
-  border: 1px solid #404040;
+  padding: 30px;
+  background: white;
+  border-radius: 8px;
+  color: #666;
+  font-size: 14px;
 }
 
 .bracket-container {
-  height: calc(100vh - 90px);
-  overflow: hidden;
-  padding: 0;
+  height: calc(100vh - 200px);
+  overflow: auto;
+  padding: 10px 0;
 }
 
 .bracket-tree {
@@ -410,52 +411,102 @@ export default {
   min-width: fit-content;
   align-items: flex-start;
   position: relative;
-  padding: 10px;
   height: 100%;
 }
 
 .stage-column {
-  min-width: 140px;
+  min-width: 200px;
+  background: white;
+  border-radius: 10px;
+  padding: 15px;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.1);
   position: relative;
   flex-shrink: 0;
 }
 
-/* Линии соединения */
+/* Линии связи между этапами */
 .stage-column:not(:last-child)::after {
   content: '';
   position: absolute;
   top: 50%;
   right: -20px;
   width: 40px;
-  height: 1px;
-  background: #404040;
+  height: 2px;
+  background: linear-gradient(to right, #3498db, #2980b9);
   z-index: 1;
+}
+
+/* Стрелки между этапами */
+.stage-column:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  top: 50%;
+  right: -26px;
+  width: 0;
+  height: 0;
+  border-left: 6px solid #2980b9;
+  border-top: 4px solid transparent;
+  border-bottom: 4px solid transparent;
+  z-index: 2;
+  transform: translateY(-50%);
 }
 
 .stage-title {
   text-align: center;
   margin: 0 0 15px 0;
-  padding: 8px 4px;
-  background: transparent;
-  color: #ffffff;
-  border-bottom: 2px solid #007acc;
-  font-size: 12px;
-  font-weight: 300;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
+  padding: 8px;
+  background: #3498db;
+  color: white;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 .matches-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 15px;
 }
 
 .match-card {
-  background: transparent;
-  border: none;
-  padding: 0;
+  border: 2px solid #e9ecef;
+  border-radius: 8px;
+  padding: 10px;
+  background: #ffffff;
+  transition: all 0.3s ease;
   position: relative;
+  overflow: hidden;
+  min-height: 100px;
+}
+
+.match-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, #3498db, #2980b9);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.match-card:hover {
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  transform: translateY(-1px);
+}
+
+.match-card:hover::before {
+  opacity: 1;
+}
+
+.match-card.finished {
+  border-color: #28a745;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fff9 100%);
+}
+
+.match-card.has-winner {
+  box-shadow: 0 3px 12px rgba(40, 167, 69, 0.2);
 }
 
 .participant {
@@ -463,368 +514,224 @@ export default {
   justify-content: space-between;
   align-items: center;
   padding: 6px 8px;
-  margin: 1px 0;
-  background: #2c2c2c;
-  border: 1px solid #404040;
-  color: #cccccc;
+  margin: 3px 0;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
   transition: all 0.3s ease;
-  position: relative;
-  font-size: 11px;
-  min-height: 24px;
-}
-
-.participant:first-child {
-  border-bottom: none;
-  border-radius: 3px 3px 0 0;
-}
-
-.participant:last-child {
-  border-top: none;
-  border-radius: 0 0 3px 3px;
+  min-height: 30px;
 }
 
 .participant.empty {
-  color: #666666;
+  color: #999;
   font-style: italic;
-  background: #1f1f1f;
+  background: #f8f9fa;
 }
 
 .participant.winner {
-  background: #007acc;
-  color: #ffffff;
-  border-color: #007acc;
-  font-weight: 500;
+  background: linear-gradient(135deg, #d4edda 0%, #c3e6cb 100%);
+  border-color: #28a745;
+  color: #155724;
+  font-weight: 700;
+  position: relative;
+  overflow: hidden;
 }
 
 .participant.winner::before {
-  content: '';
+  content: '🏆';
   position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 3px;
-  background: #00ff88;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 12px;
+  opacity: 0.8;
 }
 
-.participant-name {
-  flex: 1;
-  font-weight: 400;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 90px;
-}
-
-.score {
-  font-size: 13px;
-  font-weight: 500;
-  color: #ffffff;
-  min-width: 20px;
-  text-align: right;
+.participant.winner .participant-name {
+  padding-right: 20px;
 }
 
 .participant.winner .score {
-  color: #ffffff;
-  font-weight: 600;
+  color: #28a745;
+  font-size: 16px;
+  text-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+
+.participant-name {
+  font-size: 11px;
+  flex: 1;
+  line-height: 1.2;
+}
+
+.score {
+  font-size: 14px;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-left: 8px;
 }
 
 .match-separator {
-  display: none;
+  text-align: center;
+  margin: 6px 0;
+  position: relative;
 }
 
 .vs {
-  display: none;
+  background: #ecf0f1;
+  padding: 2px 6px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #7f8c8d;
 }
 
 .match-result {
-  display: none;
+  font-size: 12px;
+  font-weight: bold;
+  color: #2c3e50;
+  margin-top: 3px;
 }
 
 .match-info {
-  position: absolute;
-  bottom: -15px;
-  left: 0;
-  font-size: 8px;
-  color: #666666;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f1f3f4;
+  font-size: 10px;
+  color: #666;
 }
 
 .match-id {
-  color: #666666;
+  font-weight: 600;
 }
 
 .match-status {
-  display: none;
+  padding: 1px 4px;
+  border-radius: 2px;
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.match-status.upcoming {
+  background: #fff3cd;
+  color: #856404;
+}
+
+.match-status.in_progress {
+  background: #cce5ff;
+  color: #004085;
+}
+
+.match-status.finished {
+  background: #d4edda;
+  color: #155724;
+}
+
+.match-status.cancelled {
+  background: #f8d7da;
+  color: #721c24;
 }
 
 .match-time {
-  display: none;
+  font-size: 9px;
+  color: #999;
 }
 
 /* Адаптивность */
-@media (max-width: 1200px) {
+@media (max-width: 768px) {
+  .bracket-header {
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  .category-tabs {
+    padding: 0 10px;
+    gap: 6px;
+  }
+  
+  .category-tab {
+    padding: 8px 12px;
+    font-size: 12px;
+    flex-direction: column;
+    gap: 4px;
+  }
+  
   .bracket-tree {
     gap: 30px;
   }
   
   .stage-column {
-    min-width: 120px;
-  }
-}
-
-@media (max-width: 768px) {
-  .bracket-page {
-    padding: 5px;
-  }
-  
-  .bracket-header {
-    flex-direction: column;
-    gap: 5px;
-    padding: 6px 10px;
-  }
-  
-  .bracket-header h2 {
-    font-size: 14px;
-  }
-  
-  .category-tabs {
-    padding: 0 5px;
-    gap: 3px;
-    margin-bottom: 10px;
-  }
-  
-  .category-tab {
-    padding: 4px 8px;
-    font-size: 10px;
-  }
-  
-  .bracket-container {
-    height: calc(100vh - 80px);
-  }
-  
-  .bracket-tree {
-    gap: 25px;
-    padding: 5px;
-  }
-  
-  .stage-column {
-    min-width: 100px;
+    min-width: 220px;
+    padding: 15px;
   }
   
   .stage-column:not(:last-child)::after {
-    right: -12px;
-    width: 25px;
-  }
-  
-  .stage-title {
-    font-size: 10px;
-    padding: 6px 2px;
-    margin-bottom: 10px;
-  }
-  
-  .matches-container {
-    gap: 8px;
-  }
-  
-  .participant {
-    padding: 4px 6px;
-    font-size: 10px;
-    min-height: 20px;
-  }
-  
-  .participant-name {
-    max-width: 70px;
-  }
-  
-  .score {
-    font-size: 11px;
-  }
-}
-
-@media (max-width: 480px) {
-  .bracket-tree {
-    gap: 20px;
-  }
-  
-  .stage-column {
-    min-width: 80px;
-  }
-  
-  .stage-column:not(:last-child)::after {
-    right: -10px;
-    width: 20px;
-  }
-  
-  .participant {
-    padding: 3px 4px;
-    font-size: 9px;
-    min-height: 18px;
-  }
-  
-  .participant-name {
-    max-width: 50px;
-  }
-  
-  .score {
-    font-size: 10px;
-  }
-  
-  .stage-title {
-    font-size: 9px;
-  }
-}
-
-/* Адаптивность */
-@media (max-width: 1200px) {
-  .bracket-tree {
-    gap: 20px;
-  }
-  
-  .stage-column {
-    min-width: 140px;
-  }
-}
-
-@media (max-width: 768px) {
-  .bracket-page {
-    padding: 5px;
-  }
-  
-  .bracket-header {
-    flex-direction: column;
-    gap: 8px;
-    padding: 8px 10px;
-  }
-  
-  .bracket-header h2 {
-    font-size: 16px;
-  }
-  
-  .category-tabs {
-    padding: 0 5px;
-    gap: 3px;
-  }
-  
-  .category-tab {
-    padding: 4px 8px;
-    font-size: 10px;
-    flex-direction: column;
-    gap: 2px;
-  }
-  
-  .bracket-container {
-    height: calc(100vh - 100px);
-  }
-  
-  .bracket-tree {
-    gap: 15px;
-    padding: 5px;
-  }
-  
-  .stage-column {
-    min-width: 120px;
-    padding: 6px;
-  }
-  
-  .stage-column:not(:last-child)::after {
-    right: -8px;
-    width: 15px;
+    right: -15px;
+    width: 30px;
   }
   
   .stage-column:not(:last-child)::before {
-    right: -11px;
-    border-left-width: 3px;
-    border-top-width: 2px;
-    border-bottom-width: 2px;
-  }
-  
-  .stage-title {
-    font-size: 8px;
-    padding: 3px;
-  }
-  
-  .match-card {
-    padding: 4px;
-    min-height: 45px;
-  }
-  
-  .participant {
-    padding: 2px 3px;
-    min-height: 16px;
-    font-size: 8px;
+    right: -21px;
   }
   
   .participant-name {
-    font-size: 8px;
+    font-size: 12px;
   }
   
-  .score {
-    font-size: 9px;
+  .stage-title {
+    font-size: 14px;
+    padding: 8px;
   }
   
-  .vs {
-    font-size: 6px;
-    padding: 1px 2px;
-  }
-  
-  .match-info {
-    font-size: 6px;
-    margin-top: 2px;
-    padding-top: 2px;
-  }
-  
-  .match-status {
-    font-size: 5px;
+  .match-card {
+    padding: 12px;
   }
 }
 
 @media (max-width: 480px) {
+  .bracket-page {
+    padding: 10px;
+  }
+  
+  .category-tabs {
+    padding: 0 5px;
+    gap: 4px;
+  }
+  
+  .category-tab {
+    padding: 6px 10px;
+    font-size: 11px;
+  }
+  
+  .match-count {
+    font-size: 10px;
+  }
+  
   .bracket-tree {
-    gap: 10px;
-  }
-  
-  .stage-column {
-    min-width: 100px;
-    padding: 4px;
-  }
-  
-  .match-card {
-    min-height: 40px;
-    padding: 3px;
-  }
-  
-  .participant {
-    min-height: 14px;
-    font-size: 7px;
-    padding: 1px 2px;
-  }
-  
-  .participant-name {
-    font-size: 7px;
-  }
-  
-  .score {
-    font-size: 8px;
-  }
-}
-
-/* Улучшения для широких экранов */
-@media (min-width: 1400px) {
-  .bracket-tree {
-    gap: 30px;
-    justify-content: center;
+    gap: 20px;
   }
   
   .stage-column {
     min-width: 180px;
-  }
-  
-  .match-card {
-    min-height: 70px;
+    padding: 10px;
   }
   
   .participant {
+    padding: 6px 8px;
+  }
+  
+  .participant-name {
+    font-size: 11px;
+  }
+  
+  .score {
+    font-size: 14px;
+  }
+  
+  .match-info {
     font-size: 10px;
-    min-height: 22px;
   }
 }
 </style>
