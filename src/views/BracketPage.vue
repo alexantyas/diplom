@@ -64,7 +64,7 @@
                 }"
               >
                 <span class="participant-name">
-                  {{ match.red_participant?.name || 'Ожидание' }}
+                  {{ getName(match.red_participant_type, match.red_participant_id) }}
                 </span>
                 <span v-if="match.status === 'finished'" class="score">
                   {{ getParticipantScore(match, 'red') }}
@@ -88,7 +88,7 @@
                 }"
               >
                 <span class="participant-name">
-                  {{ match.blue_participant?.name || 'Ожидание' }}
+                  {{ getName(match.blue_participant_type, match.blue_participant_id) }}
                 </span>
                 <span v-if="match.status === 'finished'" class="score">
                   {{ getParticipantScore(match, 'blue') }}
@@ -122,11 +122,16 @@
 </template>
 
 <script>
-import { getBracketData, getBracketDataByCategory, getMatchWithParticipants, getCompetitions } from '../store/bracket.js'
+import { mapState } from 'vuex'
+import { 
+  getBracketData,
+  getBracketDataByCategory,
+  getCompetitions
+} from '../store/bracket.js'
 
 export default {
   name: 'BracketPage',
-  
+
   data() {
     return {
       competitionId: null,
@@ -138,11 +143,20 @@ export default {
       error: null
     }
   },
-  
+
+  computed: {
+    ...mapState(['participants']),
+    participantsMap() {
+      const m = {}
+      this.participants.forEach(p => {
+        m[`${p.type}:${p.id}`] = p.name
+      })
+      return m
+    }
+  },
+
   async mounted() {
-    // Получаем ID турнира из URL
     this.competitionId = this.$route.params.id
-    
     if (this.competitionId) {
       await this.loadBracketData()
       await this.loadCompetitionInfo()
@@ -159,15 +173,13 @@ export default {
           this.loadBracketData()
           this.loadCompetitionInfo()
         }
-      },
-      immediate: false
+      }
     }
   },
 
   methods: {
     async loadCompetitionInfo() {
       if (!this.competitionId) return
-      
       try {
         const competitions = await getCompetitions()
         const competition = competitions.find(c => c.id == this.competitionId)
@@ -182,16 +194,11 @@ export default {
         this.bracketData = null
         return
       }
-
       this.loading = true
       this.error = null
-      
       try {
         const data = await getBracketData(this.competitionId)
-        
         this.bracketData = data
-        
-        // Автоматически выбираем первую категорию
         if (data.categoryNames.length > 0) {
           this.selectedCategory = data.categoryNames[0]
           await this.loadCategoryData(this.selectedCategory)
@@ -211,17 +218,8 @@ export default {
 
     async loadCategoryData(category) {
       if (!category || !this.competitionId) return
-      
       try {
         const categoryData = await getBracketDataByCategory(this.competitionId, category)
-        
-        // Загружаем информацию об участниках для каждого матча в категории
-        for (const stage of categoryData.stageOrder) {
-          for (let i = 0; i < categoryData.stages[stage].length; i++) {
-            categoryData.stages[stage][i] = await getMatchWithParticipants(categoryData.stages[stage][i])
-          }
-        }
-        
         this.currentCategoryData = categoryData
       } catch (error) {
         console.error('Ошибка загрузки данных категории:', error)
@@ -229,56 +227,45 @@ export default {
       }
     },
 
+    getName(type, id) {
+      return this.participantsMap[`${type}:${id}`] || 'Ожидание'
+    },
+
     getTotalMatchesInCategory(category) {
       if (!this.bracketData?.categories[category]) return 0
-      
       const stages = this.bracketData.categories[category]
-      return Object.values(stages).reduce((total, matches) => total + matches.length, 0)
+      return Object.values(stages).reduce((t, arr) => t + arr.length, 0)
     },
 
     isWinner(match, side) {
-      if (match.status !== 'finished' || !match.winner_participant_id) {
-        return false
-      }
-      
-      if (side === 'red') {
-        return match.winner_participant_id === match.red_participant_id
-      } else {
-        return match.winner_participant_id === match.blue_participant_id
-      }
+      if (match.status !== 'finished' || !match.winner_participant_id) return false
+      return side === 'red'
+        ? match.winner_participant_id === match.red_participant_id
+        : match.winner_participant_id === match.blue_participant_id
     },
 
     getParticipantScore(match, side) {
       if (!match.score) return '0'
-      
-      // Предполагаем формат счета "3:2" или просто число для победителя
       if (typeof match.score === 'string' && match.score.includes(':')) {
-        const scores = match.score.split(':')
-        return side === 'red' ? scores[0] : scores[1]
+        const [r, b] = match.score.split(':')
+        return side === 'red' ? r : b
       }
-      
-      // Если это просто число очков для победителя
-      if (this.isWinner(match, side)) {
-        return match.score
-      }
-      
-      return '0'
+      return this.isWinner(match, side) ? match.score : '0'
     },
 
     getStatusText(status) {
-      const statusMap = {
-        'upcoming': 'Предстоящий',
-        'in_progress': 'В процессе', 
-        'finished': 'Завершен',
-        'cancelled': 'Отменен'
+      const map = {
+        upcoming: 'Предстоящий',
+        in_progress: 'В процессе',
+        finished: 'Завершен',
+        cancelled: 'Отменен'
       }
-      return statusMap[status] || status
+      return map[status] || status
     },
 
-    formatDateTime(dateTime) {
-      if (!dateTime) return ''
-      const date = new Date(dateTime)
-      return date.toLocaleString('ru-RU', {
+    formatDateTime(dt) {
+      if (!dt) return ''
+      return new Date(dt).toLocaleString('ru-RU', {
         day: '2-digit',
         month: '2-digit',
         hour: '2-digit',
@@ -287,15 +274,11 @@ export default {
     },
 
     getMatchPositionStyle(stageIndex, matchIndex) {
-      // Добавляем дополнительные отступы для лучшего визуального распределения
-      const baseMargin = 20
-      const stageMultiplier = Math.pow(2, stageIndex)
-      const marginTop = baseMargin * stageMultiplier * matchIndex
-      
-      return {
-        marginTop: `${marginTop}px`
-      }
-    }
+  const baseMargin = 8      // было 20 → стало 8px
+  const stageMultiplier = Math.pow(2, stageIndex)
+  const marginTop = baseMargin * stageMultiplier * matchIndex
+  return { marginTop: `${marginTop}px` }
+}
   }
 }
 </script>
