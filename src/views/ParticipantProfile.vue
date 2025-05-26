@@ -93,7 +93,7 @@
 
 
 <script>
-import api from '@/api';
+import api from '../store/api.js';
 import { ref, onMounted, computed } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';

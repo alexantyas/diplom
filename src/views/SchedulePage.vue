@@ -189,7 +189,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
-import { createMatchesBatch } from '@/api'
+import { createMatchesBatch } from '../store/api.js'
 
 export default {
   setup() {

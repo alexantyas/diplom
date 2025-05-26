@@ -74,7 +74,12 @@ const routes = [
     { path: 'bracket', component: BracketPage },
     { path: 'judges', component: JudgesPage },
     { path: 'participants', component: ParticipantsPage },
-    { path: 'print', component: PrintPage }
+    { path: 'print', component: PrintPage },
+    {
+  path: '/competition/:id/bracket',
+  component: BracketPage,
+  props: route => ({ competitionId: parseInt(route.params.id) })
+}
   ]
 }
 

@@ -92,5 +92,13 @@ export function getCompetitions() {
 export function getAllApplications() {
   return api.get('/applications/');
 }
+export const getUserById = async (userId) => {
+  const response = await axiosInstance.get(`/users/${userId}`)
+  return response.data
+}
 
+export const getTeamById = async (teamId) => {
+  const response = await axiosInstance.get(`/teams/${teamId}`)
+  return response.data
+}
 export default api;

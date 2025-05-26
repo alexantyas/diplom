@@ -55,7 +55,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
-import api from '@/api';
+import api from '../store/api.js';
 
 export default {
   setup() {

@@ -5,7 +5,7 @@
 <script>
 import { useStore } from 'vuex'
 import { useRouter } from 'vue-router'
-import { useBracketStore } from '@/store/bracketStore'
+import { useBracketStore } from '@/store/bracket'
 
 export default {
   name: 'Header',

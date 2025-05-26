@@ -35,8 +35,8 @@
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
-import { loginUser } from '@/api';
-import api from '@/api';
+import { loginUser } from '../store/api.js';
+import api from '../store/api.js';
 
 export default {
   setup() {
