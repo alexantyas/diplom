@@ -57,7 +57,7 @@
 </template>
 
 <script>
-import api from '../store/api.js';
+import api from '../api.js';
 import { ref, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';

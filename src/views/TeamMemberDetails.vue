@@ -101,7 +101,7 @@
 import { ref, onMounted, computed } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
 import { useStore } from 'vuex';
-import api from '../store/api.js';
+import api from '../api.js';
 
 export default {
   setup() {

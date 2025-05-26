@@ -49,7 +49,7 @@
 import { ref, onMounted } from 'vue';
 import { useStore } from 'vuex';
 import { useRouter } from 'vue-router';
-import api from '../store/api.js';
+import api from '../api.js';
 
 export default {
   setup() {

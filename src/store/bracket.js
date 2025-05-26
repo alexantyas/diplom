@@ -2,7 +2,7 @@ import {
   getMatchesByCompetition as apiGetMatchesByCompetition,
   getCompetitions as apiGetCompetitions,
   putMatch as apiPutMatch
-} from './api.js'
+} from '../api.js'
 
 // Получить все матчи для турнира
 export const getMatchesByCompetition = async (competitionId) => {
