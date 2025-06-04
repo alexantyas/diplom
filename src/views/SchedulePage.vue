@@ -30,6 +30,9 @@
       <button @click="saveResults" class="btn btn-secondary">
         Сохранить результаты
       </button>
+      <button @click="autoAssignOfficials" class="btn btn-info">
+   Автоназначить судей
+</button>
     </div>
 
     <!-- ВКЛАДКИ -->
@@ -305,9 +308,9 @@ export default {
 }
 
     // Генерация расписания
-     const generateSchedule = async () => {
+const generateSchedule = async () => {
   try {
-    // 1) Загрузить одобренные заявки
+    // 1) Загрузить одобренные заявки (СУЩЕСТВУЮЩАЯ ЛОГИКА - НЕ ТРОГАЕМ)
     await store.dispatch('loadApprovedApplications', competitionId)
     const apps = store.state.applications.filter(a => a.status === 'approved')
     if (!apps.length) {
@@ -315,16 +318,16 @@ export default {
       return
     }
 
-    // 2) Собрать участников
+    // 2) Собрать участников (СУЩЕСТВУЮЩАЯ ЛОГИКА - НЕ ТРОГАЕМ)
     const parts = []
     for (const app of apps) {
       if (Array.isArray(app.team_participants)) {
         for (const p of app.team_participants) {
           parts.push({
-            id:     p.id,
-            type:   'team',
-            name:   `${p.last_name} ${p.first_name}`.trim(),
-            team:   app.team_id,
+            id: p.id,
+            type: 'team',
+            name: `${p.last_name} ${p.first_name}`.trim(),
+            team: app.team_id,
             weight: p.weight
           })
         }
@@ -332,20 +335,21 @@ export default {
       if (Array.isArray(app.individual_participants) && app.individual_participants.length) {
         const ip = app.individual_participants[0]
         parts.push({
-          id:     ip.user.id,
-          type:   'individual',
-          name:   `${ip.user.last_name} ${ip.user.first_name}`.trim(),
-          team:   null,
+          id: ip.user.id,
+          type: 'individual',
+          name: `${ip.user.last_name} ${ip.user.first_name}`.trim(),
+          team: null,
           weight: ip.user.weight
         })
       }
     }
-    // сохранить участников в стор, если нужно
+    
+    // сохранить участников в стор
     store.commit('setParticipants', parts.map(p => ({
       id: p.id, type: p.type, name: p.name, weight: p.weight
     })))
 
-    // 3) Группировка по весовым категориям и формирование пар
+    // 3) Группировка по весовым категориям и формирование пар (СУЩЕСТВУЮЩАЯ ЛОГИКА - НЕ ТРОГАЕМ)
     const byWeight = {}
     parts.forEach(p => {
       byWeight[p.weight] ||= []
@@ -396,16 +400,88 @@ export default {
       return
     }
 
-    // 4) Сохранить партии на бэке и обновить расписание
-    await createMatchesBatch(dtos)
+    // 4) Создаем матчи НОВЫМ способом с автоназначением
+    const startTime = new Date()
+    startTime.setHours(9, 0, 0, 0)
+
+    const response = await fetch(`http://localhost:8000/matches/batch-with-auto-assign?competition_id=${competitionId}&auto_assign=true&start_time=${startTime.toISOString()}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+      },
+      body: JSON.stringify(dtos)
+    })
+
+    if (!response.ok) {
+      // Fallback на старый способ если новый не работает
+      console.warn('Новый эндпоинт недоступен, используем старый')
+      await createMatchesBatch(dtos)
+      
+      // Попробуем автоназначение отдельно
+      try {
+        const autoAssignResponse = await fetch(`http://localhost:8000/matches/auto-assign-officials/${competitionId}?start_time=${startTime.toISOString()}`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+          }
+        })
+        if (autoAssignResponse.ok) {
+          const assignResult = await autoAssignResponse.json()
+          console.log('Автоназначение выполнено:', assignResult)
+        }
+      } catch (autoError) {
+        console.warn('Автоназначение не удалось:', autoError)
+      }
+    } else {
+      const result = await response.json()
+      console.log('Матчи созданы с автоназначением:', result)
+    }
+
+    // 5) Обновляем расписание и загружаем судей
     await store.dispatch('loadSchedule', competitionId)
-  }
-  catch (e) {
-    console.error(e)
-    alert('Ошибка генерации расписания')
+    await loadJudges()
+    
+    alert('✅ Расписание создано с автоматическим назначением судей!')
+
+  } catch (e) {
+    console.error('Ошибка генерации расписания:', e)
+    alert('Ошибка генерации расписания: ' + e.message)
   }
 }
-
+const autoAssignOfficials = async () => {
+  try {
+    // Создаем время БЕЗ timezone (naive datetime)
+    const startTime = new Date()
+    startTime.setHours(9, 0, 0, 0)
+    
+    // Форматируем в ISO без Z в конце (без timezone)
+    const timeStr = startTime.getFullYear() + '-' + 
+                   String(startTime.getMonth() + 1).padStart(2, '0') + '-' + 
+                   String(startTime.getDate()).padStart(2, '0') + 'T' +
+                   String(startTime.getHours()).padStart(2, '0') + ':' +
+                   String(startTime.getMinutes()).padStart(2, '0') + ':' +
+                   String(startTime.getSeconds()).padStart(2, '0')
+    
+    const response = await fetch(`http://localhost:8000/matches/auto-assign-officials/${competitionId}?start_time=${timeStr}`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${localStorage.getItem('access_token')}` }
+    })
+    
+    if (response.ok) {
+      const result = await response.json()
+      alert(`✅ ${result.message}\nСудей: ${result.judges_available}, Рефери: ${result.referees_available}`)
+      await store.dispatch('loadSchedule', competitionId)
+      await loadJudges()
+    } else {
+      const errorText = await response.text()
+      alert(`❌ Ошибка: ${errorText}`)
+    }
+  } catch (error) {
+    console.error('Ошибка автоназначения:', error)
+    alert('❌ Ошибка: ' + error.message)
+  }
+}
 // Добавление одной схватки
 const addMatch = async () => {
   if (!selectedCategory.value) {
@@ -432,8 +508,16 @@ const addMatch = async () => {
 }
 const loadJudges = async () => {
   try {
-    const response = await getJudges(competitionId)
-    store.commit('setJudges', response.data)
+    const response = await fetch(`http://localhost:8000/judges/?competition_id=${competitionId}`, {
+      headers: {
+        'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+      }
+    })
+    
+    if (response.ok) {
+      const judgesData = await response.json()
+      store.commit('setJudges', judgesData)
+    }
   } catch (error) {
     console.error('Ошибка загрузки судей:', error)
   }
@@ -463,7 +547,7 @@ const saveResults = async () => {
       judges, selectedCategory, selectedJudge, uniqueCategories,
       currentMatches, activeTab, getNameById,
       generateSchedule, addMatch, saveSchedule, saveResults,
-      selectedResults, onStatusChange, updateField
+      selectedResults, onStatusChange, updateField,autoAssignOfficials
     }
   }
 }

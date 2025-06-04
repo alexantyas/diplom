@@ -1,160 +1,192 @@
 <template>
   <div style="background-color: #e0dcd5; min-height: 100vh;">
-  <div class="container mt-3">
-    <h3>⚖️ Судейская</h3>
+    <div class="container mt-3">
+      <h3>⚖️ Судейская</h3>
 
-    <!-- ✅ Таблица судей -->
-    <div class="card p-3 shadow-sm mb-3">
-      <h6>📜 Список судей</h6>
-      <input type="file" @change="importJudges" accept=".xlsx, .xls" class="form-control form-control-sm mb-2">
-      <button @click="downloadJudgesTemplate" class="btn btn-outline-primary btn-sm w-100">📥 Скачать шаблон судей</button>
+      <!-- ✅ Таблица судей -->
+      <div class="card p-3 shadow-sm mb-3">
+        <h6>📜 Список судей</h6>
+        <input type="file" @change="importJudges" accept=".xlsx, .xls" class="form-control form-control-sm mb-2">
+        <button @click="downloadJudgesTemplate" class="btn btn-outline-primary btn-sm w-100 mb-3">📥 Скачать шаблон судей</button>
 
-      <table class="table table-striped mt-2">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>ФИО</th>
-            <th>Квалификация</th>
-            <th>Ковер</th>
-            <th>Действия</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="(judge, index) in judges" :key="index">
-            <td>{{ index + 1 }}</td>
-            <td><input v-model="judge.name" class="form-control form-control-sm"></td>
-            <td>
-              <select v-model="judge.category" class="form-select form-select-sm">
+        <table class="table table-striped mt-2">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>ФИО</th>
+              <th>Квалификация</th>
+              <th>Ковер</th>
+              <th>Действия</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="(judge, index) in judges" :key="judge.id">
+              <td>{{ index + 1 }}</td>
+              <td>{{ judge.name }}</td>
+              <td>{{ judge.category }}</td>
+              <td>{{ judge.tatami }}</td>
+              <td>
+                <button @click="editJudge(judge)" class="btn btn-primary btn-sm">✏️</button>
+                <button @click="removeJudge(judge.id)" class="btn btn-danger btn-sm ms-2">🗑</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+
+        <!-- Форма добавления нового судьи -->
+        <div class="mt-3">
+          <h6>Добавить судью</h6>
+          <div class="row g-2">
+            <div class="col-md-4">
+              <input v-model="newJudge.name" class="form-control form-control-sm" placeholder="ФИО судьи">
+            </div>
+            <div class="col-md-3">
+              <select v-model="newJudge.category" class="form-select form-select-sm">
+                <option value="">Выберите квалификацию</option>
                 <option>Международная</option>
                 <option>Национальная</option>
                 <option>Региональная</option>
               </select>
-            </td>
-            <td><input v-model.number="judge.tatami" type="number" class="form-control form-control-sm"></td>
-            <td>
-              <button @click="updateJudge(index, judge)" class="btn btn-primary btn-sm">💾</button>
-              <button @click="removeJudge(index)" class="btn btn-danger btn-sm ms-2">🗑</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
+            </div>
+            <div class="col-md-2">
+              <input v-model.number="newJudge.tatami" type="number" class="form-control form-control-sm" placeholder="Ковер">
+            </div>
+            <div class="col-md-3">
+              <button @click="addJudge" class="btn btn-success btn-sm w-100">Добавить</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Сообщения -->
+      <div v-if="successMessage" class="alert alert-success">{{ successMessage }}</div>
+      <div v-if="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
     </div>
-
-    <!-- ✅ Таблица расписания для судей -->
-    
-
-    <!-- ✅ Кнопка для сохранения всех результатов -->
-    
-  </div>
   </div>
 </template>
 
 <script>
-import { computed, ref } from "vue";
-import { useStore } from "vuex";
-import * as XLSX from "xlsx";
+import { ref, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
+import * as XLSX from 'xlsx'
+import { getJudges, createJudges, importJudges as apiImportJudges, deleteJudge } from '@/api/judgeService'
 
 export default {
   setup() {
-    const store = useStore();
-    const schedule = computed(() => store.state.schedule);
-    const successMessage = ref("");
+    const route = useRoute()
+    const competitionId = Number(route.params.id)
+    
+    const judges = ref([])
+    const newJudge = ref({ name: '', category: '', tatami: 1 })
+    const successMessage = ref('')
+    const errorMessage = ref('')
 
-    // ✅ Берём судей из localStorage или Vuex
-    const judges = ref(JSON.parse(localStorage.getItem("judges")) || store.state.judges);
-
-    // ✅ Сохранение результата отдельного матча
-    const saveResult = (index, match) => {
-      store.commit("updateMatch", { index, match });
-      successMessage.value = `Результат матча #${index + 1} сохранен!`;
-      setTimeout(() => (successMessage.value = ""), 3000);
-    };
-
-    // ✅ Сохранение всех результатов
-    const saveAllResults = () => {
-      store.commit("saveResults", schedule.value);
-      successMessage.value = "Все результаты сохранены!";
-      setTimeout(() => (successMessage.value = ""), 3000);
-    };
-
-    // ✅ Обновление судьи
-    const updateJudge = (index, judge) => {
-      judges.value[index] = { ...judge };
-      store.commit("updateJudge", { index, ...judge });
-
-      // ✅ Сохраняем обновлённый список в localStorage
-      localStorage.setItem("judges", JSON.stringify(judges.value));
-    };
-
-    // ✅ Удаление судьи из списка
-    const removeJudge = (index) => {
-      if (confirm("Удалить судью?")) {
-        judges.value.splice(index, 1); // Удаляем из списка
-        store.commit("removeJudge", index); // Удаляем из Vuex
-
-        // ✅ Обновляем localStorage
-        localStorage.setItem("judges", JSON.stringify(judges.value));
+    // Загрузка судей из API
+    const loadJudges = async () => {
+      try {
+        const response = await getJudges(competitionId)
+        judges.value = response.data
+      } catch (error) {
+        console.error('Ошибка загрузки судей:', error)
+        errorMessage.value = 'Ошибка загрузки судей'
       }
-    };
-
-    // ✅ Импорт списка судей из Excel
-    const importJudges = async (event) => {
-  const file = event.target.files[0];
-  if (!file) return alert("Выберите файл");
-
-  const reader = new FileReader();
-  reader.onload = (e) => {
-    try {
-      const data = new Uint8Array(e.target.result);
-      const workbook = XLSX.read(data, { type: "array" });
-      const sheet = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
-
-      if (sheet.length === 0) {
-        alert("Ошибка: Пустой файл");
-        return;
-      }
-
-      // ✅ Учитываем правильное название столбца "ФИО судьи"
-      const importedJudges = sheet.map(row => ({
-        name: row["ФИО судьи"]?.trim() || "Не указано", 
-        category: row["Квалификация"]?.trim() || "Региональная",
-        tatami: row["Татами"] ? Number(row["Татами"]) : 1
-      }));
-
-      // ✅ Обновляем Vuex и localStorage
-      store.commit("setJudges", importedJudges);
-      judges.value = [...importedJudges];
-      localStorage.setItem("judges", JSON.stringify(importedJudges));
-
-      alert("✅ Судьи успешно импортированы!");
-
-    } catch (error) {
-      alert("Ошибка при обработке файла: " + error.message);
     }
-  };
-  reader.readAsArrayBuffer(file);
-};
 
+    // Добавление судьи
+    const addJudge = async () => {
+      if (!newJudge.value.name.trim()) {
+        errorMessage.value = 'Введите ФИО судьи'
+        return
+      }
 
-    // ✅ Скачивание шаблона списка судей
+      try {
+        const judgeData = {
+          ...newJudge.value,
+          competition_id: competitionId
+        }
+        
+        await createJudges([judgeData])
+        await loadJudges()
+        
+        // Очистка формы
+        newJudge.value = { name: '', category: '', tatami: 1 }
+        successMessage.value = 'Судья успешно добавлен!'
+        setTimeout(() => successMessage.value = '', 3000)
+      } catch (error) {
+        console.error('Ошибка добавления судьи:', error)
+        errorMessage.value = 'Ошибка добавления судьи'
+      }
+    }
+
+    // Удаление судьи
+    const removeJudge = async (judgeId) => {
+      if (!confirm('Удалить судью?')) return
+
+      try {
+        await deleteJudge(judgeId)
+        await loadJudges()
+        successMessage.value = 'Судья удален!'
+        setTimeout(() => successMessage.value = '', 3000)
+      } catch (error) {
+        console.error('Ошибка удаления судьи:', error)
+        errorMessage.value = 'Ошибка удаления судьи'
+      }
+    }
+
+    // Импорт судей из Excel
+    const importJudges = async (event) => {
+      const file = event.target.files[0]
+      if (!file) return
+
+      try {
+        await apiImportJudges(competitionId, file)
+        await loadJudges()
+        successMessage.value = 'Судьи успешно импортированы!'
+        setTimeout(() => successMessage.value = '', 3000)
+      } catch (error) {
+        console.error('Ошибка импорта судей:', error)
+        errorMessage.value = 'Ошибка импорта судей'
+      }
+    }
+
+    // Скачивание шаблона
     const downloadJudgesTemplate = () => {
-      const ws = XLSX.utils.json_to_sheet([{ "ФИО": "", "Квалификация": "Международная", "Ковер": 1 }]);
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, ws, "Шаблон судей");
-      XLSX.writeFile(wb, "Шаблон_судей.xlsx");
-    };
+      const ws = XLSX.utils.json_to_sheet([
+        { "ФИО судьи": "", "Квалификация": "Международная", "Татами": 1 }
+      ])
+      const wb = XLSX.utils.book_new()
+      XLSX.utils.book_append_sheet(wb, ws, "Шаблон судей")
+      XLSX.writeFile(wb, "Шаблон_судей.xlsx")
+    }
 
-    return { 
-      schedule, 
-      judges, 
-      saveResult, 
-      saveAllResults, 
-      updateJudge, 
-      removeJudge, 
-      importJudges, 
-      downloadJudgesTemplate 
-    };
+    const editJudge = (judge) => {
+      // Можно добавить модальное окно для редактирования
+      console.log('Редактирование судьи:', judge)
+    }
+
+    onMounted(() => {
+      if (competitionId) {
+        loadJudges()
+      }
+    })
+
+    return {
+      judges,
+      newJudge,
+      successMessage,
+      errorMessage,
+      addJudge,
+      removeJudge,
+      importJudges,
+      downloadJudgesTemplate,
+      editJudge
+    }
   }
-};
-
+}
 </script>
+
+<style scoped>
+.alert {
+  margin-top: 1rem;
+}
+</style>
