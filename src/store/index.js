@@ -149,7 +149,14 @@ export default createStore({
         commit('SET_LOADING', false);
       }
     },
-
+    async loadJudges({ commit }, competitionId) {
+  try {
+    const { data } = await getJudges(competitionId)
+    commit('setJudges', data)
+  } catch (error) {
+    commit('SET_ERROR', error.message || 'Ошибка загрузки судей')
+  }
+},
     async loadApprovedApplications({ commit }, competitionId) {
       if (!competitionId) throw new Error('Competition ID is missing');
       const { data } = await getApprovedApplications(competitionId);

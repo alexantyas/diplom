@@ -188,6 +188,8 @@ import { ref, computed, onMounted, watch } from 'vue'
 import { useStore } from 'vuex'
 import { useRoute } from 'vue-router'
 import { createMatchesBatch } from '../api.js'
+import { getJudges } from '@/api/judgeService'
+
 
 export default {
   setup() {
@@ -281,16 +283,26 @@ export default {
 
     // Общий апдейт остальных полей
     async function updateField(m) {
-      const updateData = {
-        stage:      m.stage,
-        match_time: m.time,
-        judge_id:   judges.value.find(j => j.name === m.judge)?.id || null,
-        referee_id: judges.value.find(j => j.name === m.referee)?.id || null,
-        score:      m.points,
-        comment:    m.note
-      }
-      await store.dispatch('updateScheduleMatch', { id: m.id, updateData,competitionId })
-    }
+  // Найти ID судьи и рефери по имени
+  const judgeObj = judges.value.find(j => j.name === m.judge)
+  const refereeObj = judges.value.find(j => j.name === m.referee)
+  
+  const updateData = {
+    stage: m.stage,
+    match_time: m.time,
+    judge_id: judgeObj?.id || null,
+    referee_id: refereeObj?.id || null,
+    score: m.points,
+    comment: m.note,
+    tatami: m.tatami  // ← Добавьте поле ковра
+  }
+  
+  await store.dispatch('updateScheduleMatch', { 
+    id: m.id, 
+    updateData, 
+    competitionId 
+  })
+}
 
     // Генерация расписания
      const generateSchedule = async () => {
@@ -418,7 +430,14 @@ const addMatch = async () => {
   await createMatchesBatch([dto])
   await store.dispatch('loadSchedule', competitionId)
 }
-
+const loadJudges = async () => {
+  try {
+    const response = await getJudges(competitionId)
+    store.commit('setJudges', response.data)
+  } catch (error) {
+    console.error('Ошибка загрузки судей:', error)
+  }
+}
 // Синхронизация расписания с бэкендом
 const saveSchedule = async () => {
   await store.dispatch('loadSchedule', competitionId)
@@ -434,6 +453,7 @@ const saveResults = async () => {
     onMounted(async () => {
       await store.dispatch('loadApprovedApplications', competitionId)
       await store.dispatch('loadSchedule', competitionId)
+      await loadJudges()
       if (!store.state.competition || store.state.competition.id !== competitionId) {
       await store.dispatch('initTournamentState', competitionId)
     }
