@@ -101,12 +101,12 @@
             <td>{{ getNameById(m.red_participant_type, m.red_participant_id) }}</td>
             <td>{{ getNameById(m.blue_participant_type, m.blue_participant_id) }}</td>
             <td>
-              <input type="time"
-                     v-model="m.time"
-                     class="form-control form-control-sm"
-                     :disabled="activeTab === 'finished'"
-                     @change="updateField(m)" />
-            </td>
+  <input type="time"
+         :value="m.match_time ? new Date(m.match_time).toLocaleTimeString('en-GB', {hour: '2-digit', minute: '2-digit', hour12: false}) : ''"
+         @change="m.time = $event.target.value; updateField(m)"
+         class="form-control form-control-sm"
+         :disabled="activeTab === 'finished'" />
+</td>
             <td>
               <select v-model="m.judge"
                       class="form-select form-select-sm"

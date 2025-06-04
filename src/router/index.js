@@ -8,7 +8,7 @@ import TeamsPage from '@/views/TeamsPage.vue';
 import SchedulePage from '@/views/SchedulePage.vue';
 import JudgesPage from '@/views/JudgesPage.vue';
 import PrintPage from '@/views/PrintPage.vue';
-import ParticipantsPage from '@/views/ParticipantsPage.vue';
+
 import BracketPage from '@/views/BracketPage.vue';
 
 const routes = [
