@@ -59,7 +59,7 @@ const routes = [
     
     { path: 'judges', component: JudgesPage },
     { path: 'print', component: PrintPage, meta: { requiresAuth: true, roles: ['organizer', 'secretariat', 'admin'] } },
-    { path: 'participants', component: ParticipantsPage, meta: { requiresAuth: true, roles: ['organizer'] } },
+    
     { path: 'bracket', component: BracketPage }
   ]
 },
@@ -73,7 +73,7 @@ const routes = [
     { path: 'schedule', component: SchedulePage },
     { path: 'bracket', component: BracketPage },
     { path: 'judges', component: JudgesPage },
-    { path: 'participants', component: ParticipantsPage },
+    
     { path: 'print', component: PrintPage },
     {
   path: '/competition/:id/bracket',
