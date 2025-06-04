@@ -57,8 +57,8 @@
       <table class="table table-bordered table-sm m-0"
              style="table-layout: fixed; width: 1600px; min-width: 1600px; white-space:nowrap;">
         <colgroup>
-          <col style="width: 40px;">
-          <col style="width: 60px;">
+          <col style="width: 25px;">
+          <col style="width: 80px;">
           <col style="width: 90px;">
           <col style="width: 250px;">
           <col style="width: 250px;">
@@ -130,11 +130,9 @@
             </td>
             <td>
               <template v-if="m.status === 'finished' && m.winner_participant_id">
-                {{ getNameById(m.winner_participant_type, m.winner_participant_id) }}
-                <span class="text-muted">
-                  ({{ m.winner_participant_type === 'team' ? 'командный' : 'индивидуальный' }})
-                </span>
-              </template>
+  {{ getNameById(m.winner_participant_type, m.winner_participant_id) }}
+  <span class="text-muted">&nbsp;</span>
+</template>
               <template v-else>
                 <select
                   v-model="selectedResults[m.id]"
@@ -147,14 +145,14 @@
                     :value="JSON.stringify({id: m.red_participant_id, type: m.red_participant_type})"
                   >
                     {{ getNameById(m.red_participant_type, m.red_participant_id) }}
-                    ({{ m.red_participant_type === 'team' ? 'командный' : 'индивидуальный' }})
+                    
                   </option>
                   <option
                     v-if="m.blue_participant_id"
                     :value="JSON.stringify({id: m.blue_participant_id, type: m.blue_participant_type})"
                   >
                     {{ getNameById(m.blue_participant_type, m.blue_participant_id) }}
-                    ({{ m.blue_participant_type === 'team' ? 'командный' : 'индивидуальный' }})
+                    
                   </option>
                 </select>
               </template>
@@ -345,11 +343,11 @@ export default {
     const dtos = []
     Object.entries(byWeight).forEach(([w, list]) => {
       const stage = list.length === 2   ? 'Финал'
-                  : list.length === 4   ? '1/2 финала'
-                  : list.length === 8   ? '1/4 финала'
-                  : list.length === 16  ? '1/8 финала'
-                  : list.length === 32  ? '1/16 финала'
-                  : '1/8 финала'
+                  : list.length === 4   ? '1/2'
+                  : list.length === 8   ? '1/4'
+                  : list.length === 16  ? '1/8'
+                  : list.length === 32  ? '1/16'
+                  : '1/8'
 
       const pool = [...list]
       while (pool.length >= 2) {
@@ -436,6 +434,9 @@ const saveResults = async () => {
     onMounted(async () => {
       await store.dispatch('loadApprovedApplications', competitionId)
       await store.dispatch('loadSchedule', competitionId)
+      if (!store.state.competition || store.state.competition.id !== competitionId) {
+      await store.dispatch('initTournamentState', competitionId)
+    }
     })
 
     return {

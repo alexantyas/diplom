@@ -85,17 +85,23 @@ export const getBracketData = async (competitionId) => {
       console.warn('Получены матчи не в виде массива:', matches)
       return {
         categories: {},
-        stageOrder: ["1/8 финала", "1/4 финала", "1/2 финала", "финал"],
+        stageOrder: ["1/8", "1/4", "1/2", "финал","3 место"],
         categoryNames: []
       }
     }
     
     const categories = {}
-    const stageOrder = ["1/8 финала", "1/4 финала", "1/2 финала", "финал"]
+    const stageOrder = [
+  "1/8",
+  "1/4",
+  "1/2",
+  "финал",
+  "3 место"
+]
     
     matches.forEach(match => {
       const category = match.category || "Без категории"
-      const stage = match.stage || "1/8 финала"
+      const stage = match.stage || "1/8"
       
       if (!categories[category]) {
         categories[category] = {}
@@ -129,13 +135,19 @@ export const getBracketDataByCategory = async (competitionId, category) => {
       console.warn('Получены матчи не в виде массива:', matches)
       return {
         stages: {},
-        stageOrder: ["1/8 финала", "1/4 финала", "1/2 финала", "финал"]
+        stageOrder: ["1/8", "1/4", "1/2", "финал","3 место"]
       }
     }
     
     const categoryMatches = matches.filter(match => match.category === category)
     const stages = {}
-    const stageOrder = ["1/8 финала", "1/4 финала", "1/2 финала", "финал"]
+    const stageOrder = [
+  "1/8",
+  "1/4",
+  "1/2",
+  "финал",
+  "3 место"
+]
     
     stageOrder.forEach(stage => {
       stages[stage] = []

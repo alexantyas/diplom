@@ -195,16 +195,7 @@ export default createStore({
     },
 
 async updateScheduleMatch({ commit, state, dispatch }, payload = {}) {
-  // 1. Проверяем, что payload — это объект
-  if (!payload || typeof payload !== 'object') {
-    const errMsg = 'Неверные данные: payload должен быть объектом с { id, updateData }';
-    console.error('[Vuex][updateScheduleMatch]', errMsg, payload);
-    commit('SET_ERROR', errMsg);
-    return;
-  }
-
-  const { id, updateData } = payload;
-  // 2. Проверяем наличие id и updateData
+  const { id, updateData, competitionId } = payload;
   if (id == null || typeof updateData !== 'object') {
     const errMsg = 'Неполные данные: нужен id и объект updateData';
     console.error('[Vuex][updateScheduleMatch]', errMsg, payload);
@@ -212,10 +203,7 @@ async updateScheduleMatch({ commit, state, dispatch }, payload = {}) {
     return;
   }
 
-  console.log('[Vuex] updateScheduleMatch →', id, updateData);
-
-  // 3. Проверяем выбранное соревнование
-  const compId = state.competition?.id;
+  const compId = competitionId || state.competition?.id;
   if (!compId) {
     const errMsg = 'Соревнование не выбрано';
     console.error('[Vuex][updateScheduleMatch]', errMsg);
@@ -224,13 +212,9 @@ async updateScheduleMatch({ commit, state, dispatch }, payload = {}) {
   }
 
   try {
-    // 4. Вызываем сервис обновления матча (PUT /matches/{id})
     const { data: updated } = await matchService.updateMatch(id, updateData);
-
-    // 5. Перезагружаем расписание и сетку
     await dispatch('loadSchedule', compId);
     await dispatch('loadBracket',  compId);
-
     return updated;
   } catch (error) {
     console.error('[Vuex][updateScheduleMatch] error →', error);
